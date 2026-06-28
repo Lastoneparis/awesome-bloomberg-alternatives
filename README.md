@@ -63,6 +63,7 @@ For building your own tools.
 - **[OpenInsider](http://openinsider.com)** — Form 4 filings, free.
 - **[Swiss-Quant SEC Tracker](https://swiss-quant.ch)** — Insider trading + institutional holdings.
 - **[Quiver Quant](https://www.quiverquant.com)** — Alt-data including congressional trades.
+- **[FilingFirehose](https://filingfirehose.com)** — Free per-ticker SEC forensic risk score. Body-text-classified 8-Ks flagging buried events (cyber, dilution, officer departures), activist-tagged 13D/G, S-3/424B5 ATM detection. REST + MCP. *Free + Paid*.
 
 ## On-Chain & Crypto Analytics
 
