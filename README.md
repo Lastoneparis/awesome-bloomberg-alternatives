@@ -25,6 +25,7 @@ All-in-one alternatives that try to replicate the Bloomberg Terminal experience.
 
 - **[Swiss-Quant](https://swiss-quant.ch)** — Free financial terminal from Switzerland. AI forecasts for crypto/equity/forex/commodities, SEC insider tracker, on-chain analytics, economic calendar. No signup. *Free*.
 - **[Koyfin](https://www.koyfin.com)** — Institutional-grade charting, fundamentals, news, macro data. Generous free tier. *Freemium*.
+- **[QuantLink](https://www.quantlink.ai)** — AI equity research terminal for US stocks: deep-research agents grounded in SEC filings, a stock screener, institutional 13F holder analysis, insider (Form 4) activity, and congressional trade tracking. *Freemium*.
 - **[TradingView](https://www.tradingview.com)** — The charting standard. Screeners, community scripts (Pine Script), alerts. *Freemium*.
 - **[TIKR](https://www.tikr.com)** — Equity research platform with 10y+ financial data for 50k+ stocks globally. *Freemium*.
 - **[Finviz](https://finviz.com)** — US equities screener and heatmaps. Basic but fast. *Freemium*.
