@@ -89,6 +89,7 @@ For building your own tools.
 
 ## Open Source Libraries
 
+- **[alphai-tui](https://github.com/makeev/alphai-tui)** — Open-source terminal stock dashboard (Rust): live quotes and candlestick charts next to AI-scored news, SEC Form 4 insider filings and earnings reads. *Free*.
 - **[OpenBB Terminal](https://github.com/OpenBB-finance/OpenBBTerminal)** — Open-source Bloomberg alternative (CLI + web).
 - **[QuantLib](https://www.quantlib.org)** — Quant finance library in C++/Python.
 - **[Zipline](https://github.com/quantopian/zipline)** — Backtesting engine.
