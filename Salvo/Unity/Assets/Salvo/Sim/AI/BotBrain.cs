@@ -102,12 +102,12 @@ namespace Salvo.Sim
                 case BotGoal.Reload:
                     buttons |= InputButtons.Reload;
                     AimAtLastKnown(self, dt);
-                    SeekCover(match, self, ref moveForward, ref moveRight, dt);
+                    SeekCover(ref moveForward, ref moveRight);
                     break;
 
                 case BotGoal.Retreat:
                     AimAtLastKnown(self, dt);
-                    SeekCover(match, self, ref moveForward, ref moveRight, dt);
+                    SeekCover(ref moveForward, ref moveRight);
                     break;
 
                 case BotGoal.Advance:
@@ -355,11 +355,17 @@ namespace Salvo.Sim
             right = _strafeSign * SalvoMath.Lerp(0.3f, 1f, _difficulty.CoverPreference);
         }
 
-        private void SeekCover(MatchSimulation match, PlayerRuntime self,
-                               ref float forward, ref float right, float dt)
+        /// <summary>
+        /// Backs away from whatever the bot is currently facing.
+        /// </summary>
+        /// <remarks>
+        /// Named for what it is for, not for what it does: there is no cover reasoning here at
+        /// all. Finding real cover needs a navigation graph to search, which is Phase 9. Backing
+        /// away from the last known threat is the honest approximation until then, and the
+        /// signature takes no world or self precisely so that nobody reads it as more than that.
+        /// </remarks>
+        private void SeekCover(ref float forward, ref float right)
         {
-            // No cover reasoning yet — backing away from the last known threat is the honest
-            // approximation until the navigation graph exists to find real cover with.
             forward = -0.8f;
             right = _strafeSign * 0.4f;
         }

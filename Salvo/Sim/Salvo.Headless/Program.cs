@@ -153,6 +153,10 @@ namespace Salvo.Headless
             Console.WriteLine($"spawns           {stats.Spawns}");
             Console.WriteLine($"shots fired      {stats.ShotsFired}");
             Console.WriteLine($"hits landed      {stats.Hits} ({stats.HitRate:P1} of shots)");
+            // Worth watching: bots aim at the chest, so a high headshot share would mean the
+            // aim error is not being applied, or the hitboxes are not where they should be.
+            Console.WriteLine($"headshots        {stats.HeadshotHits} "
+                              + $"({(stats.Hits == 0 ? 0 : (double)stats.HeadshotHits / stats.Hits):P1} of hits)");
             Console.WriteLine($"deaths           {stats.Deaths}");
             Console.WriteLine($"footsteps        {stats.Footsteps}");
             Console.WriteLine($"distance moved   {stats.DistanceMoved:F0} m total");
