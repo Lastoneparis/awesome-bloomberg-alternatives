@@ -3,116 +3,6 @@ import CoreGraphics
 import UIKit
 import CriticalStrikeCore
 
-/// A single-channel floating-point image. Every procedural texture starts life as one of
-/// these — a height field — and the albedo, normal, roughness and ambient-occlusion maps
-/// are all derived from it. Deriving them from a shared height field rather than
-/// generating each independently is what makes the maps agree with each other, which is
-/// the difference between a surface that reads as one material and one that reads as
-/// noise with a normal map stuck on top.
-struct ScalarField {
-    let width: Int
-    let height: Int
-    var values: [Float]
-
-    init(width: Int, height: Int, repeating value: Float = 0) {
-        self.width = width
-        self.height = height
-        self.values = [Float](repeating: value, count: width * height)
-    }
-
-    /// Builds a field by evaluating a generator over normalized [0,1) coordinates.
-    init(width: Int, height: Int, generator: (Float, Float) -> Float) {
-        self.width = width
-        self.height = height
-        self.values = [Float](repeating: 0, count: width * height)
-        let inverseWidth = 1 / Float(width)
-        let inverseHeight = 1 / Float(height)
-        for y in 0..<height {
-            let v = Float(y) * inverseHeight
-            for x in 0..<width {
-                values[y * width + x] = generator(Float(x) * inverseWidth, v)
-            }
-        }
-    }
-
-    @inline(__always)
-    subscript(x: Int, y: Int) -> Float {
-        get {
-            // Wrapped sampling keeps every derived map seamless at the tile edges.
-            let wx = ((x % width) + width) % width
-            let wy = ((y % height) + height) % height
-            return values[wy * width + wx]
-        }
-        set {
-            let wx = ((x % width) + width) % width
-            let wy = ((y % height) + height) % height
-            values[wy * width + wx] = newValue
-        }
-    }
-
-    var range: (min: Float, max: Float) {
-        var lo = Float.greatestFiniteMagnitude
-        var hi = -Float.greatestFiniteMagnitude
-        for value in values {
-            lo = Swift.min(lo, value)
-            hi = Swift.max(hi, value)
-        }
-        return (lo, hi)
-    }
-
-    /// Rescales to [0,1]. Procedural fields rarely use their full range, and normalizing
-    /// before deriving normals keeps the bump strength predictable across surfaces.
-    func normalized() -> ScalarField {
-        let (lo, hi) = range
-        guard hi - lo > 1e-6 else { return self }
-        var out = self
-        let scale = 1 / (hi - lo)
-        for index in out.values.indices {
-            out.values[index] = (out.values[index] - lo) * scale
-        }
-        return out
-    }
-
-    func mapped(_ transform: (Float) -> Float) -> ScalarField {
-        var out = self
-        for index in out.values.indices {
-            out.values[index] = transform(out.values[index])
-        }
-        return out
-    }
-
-    func combined(with other: ScalarField, _ transform: (Float, Float) -> Float) -> ScalarField {
-        var out = self
-        for index in out.values.indices {
-            out.values[index] = transform(out.values[index], other.values[index])
-        }
-        return out
-    }
-
-    /// Separable box blur with wrapping, used to soften masks and build cheap AO.
-    func blurred(radius: Int) -> ScalarField {
-        guard radius > 0 else { return self }
-        var horizontal = self
-        let window = Float(radius * 2 + 1)
-        for y in 0..<height {
-            for x in 0..<width {
-                var sum: Float = 0
-                for offset in -radius...radius { sum += self[x + offset, y] }
-                horizontal.values[y * width + x] = sum / window
-            }
-        }
-        var out = horizontal
-        for y in 0..<height {
-            for x in 0..<width {
-                var sum: Float = 0
-                for offset in -radius...radius { sum += horizontal[x, y + offset] }
-                out.values[y * width + x] = sum / window
-            }
-        }
-        return out
-    }
-}
-
 /// An RGBA8 image under construction. Writing bytes directly is roughly two orders of
 /// magnitude faster than drawing a rectangle per pixel with Core Graphics, which matters
 /// when a match needs a few dozen 512² textures during the loading screen.
@@ -158,45 +48,13 @@ struct PixelCanvas {
     }
 }
 
-/// Linear RGB triple. Texture synthesis mixes colours constantly and `UIColor` round trips
-/// are far too slow to do per pixel.
-struct RGB {
-    var r: Float
-    var g: Float
-    var b: Float
-
-    init(_ r: Float, _ g: Float, _ b: Float) {
-        self.r = r; self.g = g; self.b = b
-    }
-
-    init(hex: UInt32) {
-        r = Float((hex >> 16) & 0xFF) / 255
-        g = Float((hex >> 8) & 0xFF) / 255
-        b = Float(hex & 0xFF) / 255
-    }
-
-    static func + (a: RGB, b: RGB) -> RGB { RGB(a.r + b.r, a.g + b.g, a.b + b.b) }
-    static func * (a: RGB, s: Float) -> RGB { RGB(a.r * s, a.g * s, a.b * s) }
-    static func * (a: RGB, b: RGB) -> RGB { RGB(a.r * b.r, a.g * b.g, a.b * b.b) }
-
-    func lerp(_ other: RGB, _ t: Float) -> RGB {
-        let clamped = MathUtil.clamp(t, 0, 1)
-        return RGB(r + (other.r - r) * clamped,
-                   g + (other.g - g) * clamped,
-                   b + (other.b - b) * clamped)
-    }
-
-    /// Multiplies brightness while keeping hue — used to shade albedo by the height field.
-    func scaled(_ factor: Float) -> RGB { RGB(r * factor, g * factor, b * factor) }
-
+extension RGB {
+    /// Bridge to UIKit, kept out of the core so the field maths stays platform-free.
     var uiColor: UIColor {
         UIColor(red: CGFloat(MathUtil.clamp(r, 0, 1)),
                 green: CGFloat(MathUtil.clamp(g, 0, 1)),
                 blue: CGFloat(MathUtil.clamp(b, 0, 1)), alpha: 1)
     }
-
-    static let white = RGB(1, 1, 1)
-    static let black = RGB(0, 0, 0)
 }
 
 enum TextureMath {
@@ -240,23 +98,14 @@ enum TextureMath {
         return canvas.makeImage()
     }
 
-    /// Cheap ambient occlusion: a point is occluded in proportion to how much the
-    /// neighbourhood rises above it. Crevices darken, peaks stay lit.
+    /// Occlusion and curvature live on `ScalarField` in the core, where they can be
+    /// tested; these forward for call-site readability.
     static func ambientOcclusion(from height: ScalarField, radius: Int = 4,
                                  strength: Float = 1) -> ScalarField {
-        let blurred = height.blurred(radius: radius)
-        return height.combined(with: blurred) { local, neighbourhood in
-            let difference = local - neighbourhood
-            // Below the local average ⇒ in a hollow ⇒ occluded.
-            return MathUtil.clamp(1 + difference * 4 * strength, 0, 1)
-        }
+        height.ambientOcclusion(radius: radius, strength: strength)
     }
 
-    /// Curvature, which is what drives edge wear: convex edges lose paint and go shiny.
     static func curvature(from height: ScalarField, radius: Int = 2) -> ScalarField {
-        let blurred = height.blurred(radius: radius)
-        return height.combined(with: blurred) { local, neighbourhood in
-            MathUtil.clamp((local - neighbourhood) * 6 + 0.5, 0, 1)
-        }
+        height.curvature(radius: radius)
     }
 }

@@ -169,7 +169,7 @@ final class TextureLibrary: @unchecked Sendable {
     /// Generates everything a match needs, in parallel, reporting progress 0…1.
     /// Called from the loading screen; by the time the first frame renders, every
     /// material already has its images.
-    func warmUp(map: MapData, loadout: Loadout,
+    func warmUp(map: MapData, loadout: Loadout, colorBlind: ColorBlindMode = .none,
                 progress: @escaping (Double) -> Void) async {
         // Only the surfaces the map actually uses — no point generating grass for an
         // indoor arena.
@@ -177,12 +177,17 @@ final class TextureLibrary: @unchecked Sendable {
         surfaces.formUnion(map.props.map(\.surface))
         surfaces.insert(.flesh)
 
-        let skins: [(SkinPattern, RGB)] = [loadout.primary, loadout.secondary, loadout.melee]
+        var skins: [(SkinPattern, RGB)] = [loadout.primary, loadout.secondary, loadout.melee]
             .map { build in
                 let cosmetic = build.skin.flatMap(CosmeticDatabase.cosmetic)
                 return (SkinPattern.pattern(for: cosmetic),
                         RGB(hex: cosmetic?.tintHex ?? 0x2E3238))
             }
+        // Operator fatigues use the same generator, and they are needed the moment the
+        // first player spawns — generating them then would hitch the opening seconds.
+        for team in [Team.strike, Team.shield] {
+            skins.append((.urbanCamo, RGB(hex: colorBlind.teamColor(team)).scaled(0.55)))
+        }
 
         let totalSteps = surfaces.count + skins.count + SpriteKind.allCases.count
             + DecalKind.allCases.count + 6

@@ -114,7 +114,8 @@ final class GameSession: NSObject, ObservableObject {
         // ever generated on the render thread mid-match.
         let loadout = sim.player(localPlayerID)?.loadout ?? Loadout.starter()
         let report = onProgress
-        await textures.warmUp(map: map, loadout: loadout) { value in
+        await textures.warmUp(map: map, loadout: loadout,
+                              colorBlind: settings.colorBlindMode) { value in
             report?(0.1 + value * 0.7)
         }
 

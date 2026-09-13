@@ -23,7 +23,8 @@ Noise.swift (core, Foundation only, unit-tested)
    value · gradient · fBm · ridged · cellular · domain warp · seamless wave
         │
         ▼
-ScalarField — a float height field, built by evaluating noise over [0,1)²
+ScalarField (core, Foundation only, unit-tested)
+   a float height field, built by evaluating noise over [0,1)²
         │
         ├─► albedo      shaded from the height field and its masks
         ├─► normal      Sobel of the same height field
@@ -50,8 +51,14 @@ get subtly wrong, and the failure mode — a faint grid across every wall in the
 hard to see on a laptop and glaring on a phone.
 
 `NoiseTests` asserts that value, gradient, fBm, ridged, cellular and warped noise all match
-across the tile boundary. The one that bit us was sine waves: `sin(x * 0.6)` over a
-four-cell tile completes 2.4 cycles, so the edges do not meet. `Noise.wave` takes **integer**
+across the tile boundary. Wrapping has to survive the *filtering* too, so `ScalarField` lives
+in the core alongside the noise and `ScalarFieldTests` pins down the property that matters:
+filtering the field and then rolling it gives the same answer as rolling it and then
+filtering. A blur that clamped or mirrored at the edges would pass every per-pixel test and
+still draw a seam line down every tiled surface in the game; this one cannot.
+
+The one that bit us was sine waves: `sin(x * 0.6)` over a four-cell tile completes 2.4
+cycles, so the edges do not meet. `Noise.wave` takes **integer**
 cycle counts instead, which makes the mistake impossible to express, and the ripples on
 Sandstorm's sand stopped showing a seam.
 

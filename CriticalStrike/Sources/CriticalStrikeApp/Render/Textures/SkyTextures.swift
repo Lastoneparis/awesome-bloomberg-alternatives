@@ -94,7 +94,7 @@ enum SkyTextureFactory {
         }
     }
 
-    private static func direction(face: Int, u: Float, v: Float) -> Vec3 {
+    private static func faceDirection(face: Int, u: Float, v: Float) -> Vec3 {
         switch face {
         case 0: return Vec3(1, -v, -u)     // +X
         case 1: return Vec3(-1, -v, u)     // −X
@@ -113,7 +113,7 @@ enum SkyTextureFactory {
             let v = (Float(y) + 0.5) * inverse - 1
             for x in 0..<size {
                 let u = (Float(x) + 0.5) * inverse - 1
-                let direction = direction(face: face, u: u, v: v).normalized
+                let direction = faceDirection(face: face, u: u, v: v).normalized
                 canvas.set(x: x, y: y, color: color(for: direction, preset: preset, seed: seed))
             }
         }

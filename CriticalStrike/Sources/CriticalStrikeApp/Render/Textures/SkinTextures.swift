@@ -55,11 +55,15 @@ enum SkinPattern: String, CaseIterable {
 enum SkinTextureFactory {
 
     static func resolution(for quality: GraphicsQuality) -> Int {
+        #if DEBUG
+        return 256
+        #else
         switch quality {
         case .low: return 256
         case .medium: return 384
         case .high, .ultra: return 512
         }
+        #endif
     }
 
     static func make(pattern: SkinPattern, tint: RGB, size: Int, seed: UInt32 = 0x5C1) -> TextureSet {

@@ -23,12 +23,18 @@ enum SurfaceTextureFactory {
     /// Texture resolution by quality tier. Low-end devices get 256², which still reads
     /// correctly at the distances a shooter actually plays at.
     static func resolution(for quality: GraphicsQuality) -> Int {
+        #if DEBUG
+        // Generation is float-heavy and a debug build runs it unoptimised, where a 512²
+        // surface takes long enough to make iteration painful. Release is unaffected.
+        return quality == .low ? 192 : 256
+        #else
         switch quality {
         case .low: return 256
         case .medium: return 384
         case .high: return 512
         case .ultra: return 768
         }
+        #endif
     }
 
     /// Deterministic per-surface seed, so a given surface always looks the same.

@@ -235,3 +235,228 @@ final class NoiseTests: XCTestCase {
         XCTAssertGreaterThan(differences, 150, "seeding barely changes the field")
     }
 }
+
+/// `ScalarField` is the substrate every procedural texture is built on, so a bug here
+/// shows up as a seam or a mismatched normal map on every surface at once. The wrapping
+/// behaviour is the part worth pinning down: it is what makes the derived maps tileable.
+final class ScalarFieldTests: XCTestCase {
+    private func ramp(width: Int = 8, height: Int = 8) -> ScalarField {
+        ScalarField(width: width, height: height) { x, y in x + y }
+    }
+
+    func testGeneratorSamplesNormalizedCoordinates() {
+        let field = ScalarField(width: 4, height: 2) { x, y in x * 10 + y }
+        // x runs 0, 0.25, 0.5, 0.75 across the row; y is 0 on the first row, 0.5 on the second.
+        XCTAssertEqual(field[0, 0], 0, accuracy: 1e-6)
+        XCTAssertEqual(field[3, 0], 7.5, accuracy: 1e-6)
+        XCTAssertEqual(field[0, 1], 0.5, accuracy: 1e-6)
+        XCTAssertEqual(field[3, 1], 8, accuracy: 1e-6)
+    }
+
+    func testSubscriptWrapsPastBothEdges() {
+        var field = ScalarField(width: 4, height: 3)
+        field[0, 0] = 1
+        field[3, 2] = 2
+
+        XCTAssertEqual(field[4, 3], 1, "one tile to the right and down should land back on the origin")
+        XCTAssertEqual(field[-4, -3], 1)
+        XCTAssertEqual(field[-1, -1], 2, "stepping off the top-left must arrive at the bottom-right")
+        XCTAssertEqual(field[7, 5], 2)
+    }
+
+    func testSubscriptSetterWraps() {
+        var field = ScalarField(width: 4, height: 4)
+        field[-1, -1] = 5
+        XCTAssertEqual(field[3, 3], 5)
+        field[8, 8] = 9
+        XCTAssertEqual(field[0, 0], 9)
+    }
+
+    func testNormalizedFillsTheUnitRange() {
+        let normalized = ramp().normalized()
+        let (lo, hi) = normalized.range
+        XCTAssertEqual(lo, 0, accuracy: 1e-6)
+        XCTAssertEqual(hi, 1, accuracy: 1e-6)
+        for value in normalized.values {
+            XCTAssertGreaterThanOrEqual(value, 0)
+            XCTAssertLessThanOrEqual(value, 1)
+        }
+    }
+
+    func testNormalizedLeavesAFlatFieldAlone() {
+        // Dividing by a zero range would produce NaN and take every derived map with it.
+        let flat = ScalarField(width: 4, height: 4, repeating: 0.3)
+        XCTAssertEqual(flat.normalized().values, flat.values)
+    }
+
+    func testNormalizedPreservesOrdering() {
+        let field = ramp()
+        let normalized = field.normalized()
+        for index in field.values.indices.dropFirst() {
+            let before = field.values[index] - field.values[index - 1]
+            let after = normalized.values[index] - normalized.values[index - 1]
+            XCTAssertEqual(before.sign, after.sign)
+        }
+    }
+
+    func testMappedAndCombined() {
+        let field = ScalarField(width: 3, height: 3, repeating: 2)
+        XCTAssertEqual(field.mapped { $0 * 3 }.values, [Float](repeating: 6, count: 9))
+        let other = ScalarField(width: 3, height: 3, repeating: 5)
+        XCTAssertEqual(field.combined(with: other, +).values, [Float](repeating: 7, count: 9))
+    }
+
+    func testBlurLeavesAFlatFieldFlat() {
+        let flat = ScalarField(width: 8, height: 8, repeating: 0.42)
+        for value in flat.blurred(radius: 3).values {
+            XCTAssertEqual(value, 0.42, accuracy: 1e-5)
+        }
+    }
+
+    func testBlurPreservesTotalEnergy() {
+        // A box blur is a weighted average, so the mean must survive it. If it does not,
+        // the wrapping is dropping or double counting samples at the edges.
+        var field = ScalarField(width: 16, height: 16)
+        var rng = DeterministicRandom(seed: 7)
+        for index in field.values.indices { field.values[index] = rng.unit() }
+        let before = field.values.reduce(0, +)
+        let after = field.blurred(radius: 2).values.reduce(0, +)
+        XCTAssertEqual(before, after, accuracy: before * 1e-3)
+    }
+
+    func testBlurBleedsAcrossTheSeam() {
+        // An impulse on the left edge must brighten the right edge, or every blurred mask
+        // in the game would show a dark line where the tile repeats.
+        var field = ScalarField(width: 16, height: 16)
+        field[0, 8] = 1
+        let blurred = field.blurred(radius: 2)
+        XCTAssertGreaterThan(blurred[15, 8], 0, "blur did not wrap horizontally")
+        XCTAssertGreaterThan(blurred[14, 8], 0)
+
+        var vertical = ScalarField(width: 16, height: 16)
+        vertical[8, 0] = 1
+        XCTAssertGreaterThan(vertical.blurred(radius: 2)[8, 15], 0, "blur did not wrap vertically")
+    }
+
+    func testBlurIsSymmetricAroundAnImpulse() {
+        var field = ScalarField(width: 16, height: 16)
+        field[8, 8] = 1
+        let blurred = field.blurred(radius: 3)
+        for offset in 1...3 {
+            XCTAssertEqual(blurred[8 - offset, 8], blurred[8 + offset, 8], accuracy: 1e-6)
+            XCTAssertEqual(blurred[8, 8 - offset], blurred[8, 8 + offset], accuracy: 1e-6)
+        }
+    }
+
+    func testZeroRadiusBlurIsIdentity() {
+        let field = ramp()
+        XCTAssertEqual(field.blurred(radius: 0).values, field.values)
+    }
+
+    func testAmbientOcclusionLightsAFlatSurfaceFully() {
+        let flat = ScalarField(width: 16, height: 16, repeating: 0.5)
+        for value in flat.ambientOcclusion(radius: 3).values {
+            XCTAssertEqual(value, 1, accuracy: 1e-4)
+        }
+    }
+
+    func testAmbientOcclusionDarkensPitsAndSparesPeaks() {
+        var field = ScalarField(width: 32, height: 32, repeating: 0.5)
+        field[8, 8] = 0      // a pit
+        field[24, 24] = 1    // a peak
+        let occlusion = field.ambientOcclusion(radius: 3, strength: 1)
+        XCTAssertLessThan(occlusion[8, 8], 0.9, "the pit should be occluded")
+        XCTAssertEqual(occlusion[24, 24], 1, accuracy: 1e-4, "the peak should stay fully lit")
+        XCTAssertGreaterThan(occlusion[16, 16], occlusion[8, 8])
+    }
+
+    func testAmbientOcclusionStaysInTheUnitRange() {
+        var rng = DeterministicRandom(seed: 11)
+        var field = ScalarField(width: 24, height: 24)
+        for index in field.values.indices { field.values[index] = rng.signedUnit() * 2 }
+        for value in field.ambientOcclusion(radius: 2, strength: 3).values {
+            XCTAssertGreaterThanOrEqual(value, 0)
+            XCTAssertLessThanOrEqual(value, 1)
+        }
+    }
+
+    func testCurvatureIsNeutralOnAFlatField() {
+        let flat = ScalarField(width: 16, height: 16, repeating: 0.7)
+        for value in flat.curvature(radius: 2).values {
+            XCTAssertEqual(value, 0.5, accuracy: 1e-4)
+        }
+    }
+
+    func testCurvatureSeparatesConvexFromConcave() {
+        var field = ScalarField(width: 32, height: 32, repeating: 0.5)
+        field[8, 8] = 1     // convex — this is where paint wears off
+        field[24, 24] = 0   // concave
+        let curvature = field.curvature(radius: 2)
+        XCTAssertGreaterThan(curvature[8, 8], 0.5)
+        XCTAssertLessThan(curvature[24, 24], 0.5)
+    }
+
+    func testFilteringCommutesWithTranslation() {
+        // The real claim behind the wrapping sampler: the field is a torus, so filtering it
+        // and then rolling it must give the same answer as rolling it and then filtering.
+        // Anything that clamps or mirrors at the edges breaks this, and the break shows up
+        // in game as a seam line down every tiled surface.
+        let size = 24
+        let source = ScalarField(width: size, height: size) { x, y in
+            Noise.fbm(x * Float(size), y * Float(size), period: size, octaves: 3, seed: 5)
+        }
+        var rolled = ScalarField(width: size, height: size)
+        let shiftX = 7, shiftY = 13
+        for y in 0..<size {
+            for x in 0..<size { rolled[x + shiftX, y + shiftY] = source[x, y] }
+        }
+
+        let filters: [(String, (ScalarField) -> ScalarField)] = [
+            ("blur", { $0.blurred(radius: 3) }),
+            ("ambient occlusion", { $0.ambientOcclusion(radius: 3) }),
+            ("curvature", { $0.curvature(radius: 2) }),
+        ]
+        for (name, filter) in filters {
+            let filteredThenRolled = filter(source)
+            let rolledThenFiltered = filter(rolled)
+            for y in 0..<size {
+                for x in 0..<size {
+                    XCTAssertEqual(rolledThenFiltered[x + shiftX, y + shiftY],
+                                   filteredThenRolled[x, y],
+                                   accuracy: 1e-5,
+                                   "\(name) is not translation invariant at \(x),\(y)")
+                }
+            }
+        }
+    }
+}
+
+final class RGBTests: XCTestCase {
+    func testHexInitialiser() {
+        let orange = RGB(hex: 0xFF7A18)
+        XCTAssertEqual(orange.r, 1, accuracy: 1e-6)
+        XCTAssertEqual(orange.g, Float(0x7A) / 255, accuracy: 1e-6)
+        XCTAssertEqual(orange.b, Float(0x18) / 255, accuracy: 1e-6)
+        XCTAssertEqual(RGB(hex: 0xFFFFFF).r, RGB.white.r)
+        XCTAssertEqual(RGB(hex: 0x000000).b, RGB.black.b)
+    }
+
+    func testLerpClampsOutsideTheUnitInterval() {
+        let a = RGB(0, 0, 0)
+        let b = RGB(1, 0.5, 0.25)
+        XCTAssertEqual(a.lerp(b, 0.5).g, 0.25, accuracy: 1e-6)
+        XCTAssertEqual(a.lerp(b, -3).r, 0, accuracy: 1e-6)
+        XCTAssertEqual(a.lerp(b, 9).r, 1, accuracy: 1e-6)
+    }
+
+    func testArithmetic() {
+        let sum = RGB(0.1, 0.2, 0.3) + RGB(0.4, 0.4, 0.4)
+        XCTAssertEqual(sum.r, 0.5, accuracy: 1e-6)
+        let scaled = RGB(0.2, 0.4, 0.6) * 2
+        XCTAssertEqual(scaled.b, 1.2, accuracy: 1e-6)
+        let modulated = RGB(0.5, 0.5, 0.5) * RGB(0.5, 1, 0)
+        XCTAssertEqual(modulated.r, 0.25, accuracy: 1e-6)
+        XCTAssertEqual(modulated.b, 0, accuracy: 1e-6)
+        XCTAssertEqual(RGB(0.4, 0.4, 0.4).scaled(0.5).g, 0.2, accuracy: 1e-6)
+    }
+}
