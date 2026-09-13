@@ -50,19 +50,22 @@ final class CollisionTests: XCTestCase {
 }
 
 final class NavigationTests: XCTestCase {
+    /// Baked once per map for the whole suite. Baking is thousands of ray traces and these
+    /// tests used to pay for it three times over.
+    private static let graphs: [(map: MapData, nav: NavGraph)] = MapDatabase.all.map { map in
+        let world = CollisionWorld(map: map)
+        return (map, NavGraph(map: map, world: world, spacing: 2.5))
+    }
+
     func testEveryMapBakesAUsableNavGraph() {
-        for map in MapDatabase.all {
-            let world = CollisionWorld(map: map)
-            let nav = NavGraph(map: map, world: world, spacing: 2.5)
+        for (map, nav) in NavigationTests.graphs {
             XCTAssertFalse(nav.isEmpty, "\(map.name) produced an empty nav graph")
             XCTAssertGreaterThan(nav.nodes.count, 40, "\(map.name) nav graph is suspiciously small")
         }
     }
 
     func testPathExistsBetweenOpposingSpawns() {
-        for map in MapDatabase.all {
-            let world = CollisionWorld(map: map)
-            let nav = NavGraph(map: map, world: world, spacing: 2.5)
+        for (map, nav) in NavigationTests.graphs {
             guard let attacker = map.spawns(for: .strike).first,
                   let defender = map.spawns(for: .shield).first else { continue }
             let path = nav.findPath(from: attacker.position, to: defender.position)
@@ -72,14 +75,41 @@ final class NavigationTests: XCTestCase {
     }
 
     func testPathToObjectivesExists() {
-        let map = MapDatabase.sandstorm
-        let world = CollisionWorld(map: map)
-        let nav = NavGraph(map: map, world: world, spacing: 2.5)
-        guard let spawn = map.spawns(for: .strike).first else { return XCTFail("no spawn") }
-        for site in map.bombSites {
-            let path = nav.findPath(from: spawn.position, to: site.center)
+        guard let entry = NavigationTests.graphs.first(where: { $0.map.id == MapDatabase.sandstorm.id })
+        else { return XCTFail("sandstorm missing") }
+        guard let spawn = entry.map.spawns(for: .strike).first else { return XCTFail("no spawn") }
+        for site in entry.map.bombSites {
+            let path = entry.nav.findPath(from: spawn.position, to: site.center)
             XCTAssertFalse(path.isEmpty, "No route from spawn to bomb site \(site.name)")
         }
+    }
+
+    /// A path is only useful if you can actually walk it. The A* was rewritten around a
+    /// binary heap and array-indexed scores; this pins the part that matters — that
+    /// consecutive waypoints are still linked nodes, and that the route ends where asked.
+    func testPathsAreConnectedAndReachTheGoal() {
+        for (map, nav) in NavigationTests.graphs {
+            guard let attacker = map.spawns(for: .strike).first,
+                  let defender = map.spawns(for: .shield).first else { continue }
+            let path = nav.findPath(from: attacker.position, to: defender.position)
+            guard path.count > 1 else { continue }
+
+            // Every step must be within one link's reach of the previous one.
+            for (a, b) in zip(path, path.dropFirst()) {
+                XCTAssertLessThan(a.distance(to: b), 6,
+                                  "\(map.name): \(a) and \(b) are not adjacent nav nodes")
+            }
+            let end = path[path.count - 1]
+            XCTAssertLessThan(end.distance(to: defender.position), 12,
+                              "\(map.name): the path stops short of the goal")
+        }
+    }
+
+    func testPathingToAnUnreachablePointFailsCleanly() {
+        guard let entry = NavigationTests.graphs.first else { return XCTFail("no maps") }
+        let outside = entry.map.bounds.max + Vec3(500, 0, 500)
+        XCTAssertTrue(entry.nav.findPath(from: entry.map.spawns.first?.position ?? .zero,
+                                         to: outside).isEmpty)
     }
 }
 

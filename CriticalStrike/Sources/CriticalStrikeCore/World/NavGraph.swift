@@ -131,42 +131,84 @@ public final class NavGraph: @unchecked Sendable {
     }
 
     /// A* over the baked graph. Returns world positions, start excluded.
+    /// A* over the baked graph.
+    ///
+    /// The open set is a binary heap and every score is an array indexed by node, because
+    /// the obvious version is quadratic with a brutal constant: a linear scan for the best
+    /// node, a dictionary lookup for each element of that scan, `openSet.contains` for
+    /// every neighbour, and `remove(at:)` shifting the array on every expansion. On a
+    /// hundred-metre map that is a couple of thousand nodes and millions of dictionary
+    /// lookups per path — fine in a demo, not fine when ten bots repath during a firefight.
+    ///
+    /// Entries carry their own priority rather than reading it back from `fScore`, so
+    /// lowering a node's score cannot corrupt the ordering of entries already in the heap.
+    /// Stale entries are simply skipped when popped.
     public func findPath(from start: Vec3, to goal: Vec3, maxNodes: Int = 4000) -> [Vec3] {
         guard let s = nearestNode(to: start), let g = nearestNode(to: goal) else { return [] }
         if s == g { return [nodes[g].position] }
 
-        var openSet: [Int] = [s]
-        var cameFrom = [Int: Int]()
-        var gScore: [Int: Float] = [s: 0]
-        var fScore: [Int: Float] = [s: heuristic(s, g)]
-        var closed = Set<Int>()
+        let count = nodes.count
+        var gScore = [Float](repeating: .greatestFiniteMagnitude, count: count)
+        var cameFrom = [Int32](repeating: -1, count: count)
+        var closed = [Bool](repeating: false, count: count)
+
+        var heap: [(priority: Float, node: Int)] = []
+        heap.reserveCapacity(64)
+
+        func push(_ node: Int, _ priority: Float) {
+            heap.append((priority, node))
+            var index = heap.count - 1
+            while index > 0 {
+                let parent = (index - 1) / 2
+                if heap[parent].priority <= heap[index].priority { break }
+                heap.swapAt(parent, index)
+                index = parent
+            }
+        }
+
+        func pop() -> Int {
+            let top = heap[0].node
+            heap[0] = heap[heap.count - 1]
+            heap.removeLast()
+            var index = 0
+            while true {
+                let left = index * 2 + 1, right = left + 1
+                var smallest = index
+                if left < heap.count, heap[left].priority < heap[smallest].priority {
+                    smallest = left
+                }
+                if right < heap.count, heap[right].priority < heap[smallest].priority {
+                    smallest = right
+                }
+                if smallest == index { break }
+                heap.swapAt(index, smallest)
+                index = smallest
+            }
+            return top
+        }
+
+        gScore[s] = 0
+        push(s, heuristic(s, g))
         var expanded = 0
 
-        while !openSet.isEmpty && expanded < maxNodes {
-            // Small graphs: a linear scan beats the overhead of a heap in practice here.
-            var bestIdx = 0
-            var bestScore = Float.greatestFiniteMagnitude
-            for (i, n) in openSet.enumerated() {
-                let f = fScore[n] ?? .greatestFiniteMagnitude
-                if f < bestScore { bestScore = f; bestIdx = i }
-            }
-            let current = openSet.remove(at: bestIdx)
-            if current == g { return reconstruct(cameFrom, current) }
-            closed.insert(current)
+        while !heap.isEmpty && expanded < maxNodes {
+            let current = pop()
+            if current == g { return reconstruct(cameFrom, from: g) }
+            if closed[current] { continue }
+            closed[current] = true
             expanded += 1
 
             for linkRaw in nodes[current].links {
                 let n = Int(linkRaw)
-                if closed.contains(n) { continue }
+                if closed[n] { continue }
                 let step = nodes[current].position.distance(to: nodes[n].position)
                 // Prefer cover: bots hugging walls read as far more competent.
                 let penalty: Float = nodes[n].isOpen ? 0.6 : 0
-                let tentative = (gScore[current] ?? .greatestFiniteMagnitude) + step + penalty
-                if tentative < (gScore[n] ?? .greatestFiniteMagnitude) {
-                    cameFrom[n] = current
+                let tentative = gScore[current] + step + penalty
+                if tentative < gScore[n] {
+                    cameFrom[n] = Int32(current)
                     gScore[n] = tentative
-                    fScore[n] = tentative + heuristic(n, g)
-                    if !openSet.contains(n) { openSet.append(n) }
+                    push(n, tentative + heuristic(n, g))
                 }
             }
         }
@@ -177,11 +219,11 @@ public final class NavGraph: @unchecked Sendable {
         nodes[a].position.distance(to: nodes[b].position)
     }
 
-    private func reconstruct(_ cameFrom: [Int: Int], _ end: Int) -> [Vec3] {
+    private func reconstruct(_ cameFrom: [Int32], from end: Int) -> [Vec3] {
         var path: [Vec3] = [nodes[end].position]
         var current = end
-        while let prev = cameFrom[current] {
-            current = prev
+        while cameFrom[current] >= 0 {
+            current = Int(cameFrom[current])
             path.append(nodes[current].position)
         }
         path.removeLast()               // drop the start node
