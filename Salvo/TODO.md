@@ -332,6 +332,61 @@ avoidance fails five tests, and filling teams in queue order fails the skill-spr
 
 ---
 
+## Persistence  *(accounts survive a restart)*
+
+- [x] `SaveFormat` — versioned, line-oriented, with migration
+- [x] `IAccountStore` with in-memory and file implementations
+- [x] Atomic writes with a retained backup, and recovery from a corrupt primary
+- [x] `salvo-headless --save <dir>` — careers continue across runs
+- [x] 23 tests
+
+### Why a text format
+
+Save data is the one thing in a game that cannot be regenerated: a lost match is a bad
+evening, a lost account is a player who stops playing. When one goes wrong the first thing
+anyone needs is to look at it, and a bit-packed blob cannot be looked at. The cost is size,
+which for a few hundred lines per account is not a cost. Output is sorted, so the same state
+always produces the same bytes and two saves can be diffed.
+
+### Three rules that are not optional
+
+**A save from a newer build is refused, never partially read.** Reading what you recognise and
+ignoring the rest destroys whatever the newer build added the moment the older one saves back
+over it — so a player who briefly opens an old client loses everything earned since. Refusing
+is visible and recoverable; silent truncation is neither. An unknown key *within* a known
+version is skipped, because that case is an additive change and rejecting it would make every
+addition breaking.
+
+**Writes are atomic.** Write to a temp file, flush to disk, rename over the target. Writing
+directly into the live file means a crash, a dying battery or an OS kill partway through
+leaves a half-written save and the account is gone. Games are killed by the OS routinely.
+
+**The previous save is kept.** A corrupt primary falls back to the backup automatically. The
+outcome all of this exists to prevent is showing a level-one account to somebody who was level
+forty; losing one match of progress is survivable, losing all of it is not.
+
+All three were verified by breaking them: partially reading a newer save fails one test,
+removing the backup fails another, and using the account id directly as a filename fails two —
+that last one being a directory-traversal bug in the most security-sensitive file the game owns.
+
+### Migration
+
+`Migrations` applies one named step per version. v1 → v2 repairs the shotgun accuracy bug: v1
+counted shots in trigger pulls, so a save can hold more hits than shots. The pellet count was
+never written and is not recoverable, so the honest repair raises the fired count to at least
+the hit count — sane, without inventing a history that did not happen. Kills and damage are
+untouched.
+
+### Known gaps
+- [ ] No database backend. `FileAccountStore` is right for a single machine and wrong for a
+      fleet; `IAccountStore` is the seam where that gets replaced.
+- [ ] No server-side authority over saves: nothing signs or validates a save against what the
+      server believes, so a local file is editable by whoever owns the device.
+- [ ] Matchmaking and party state are still in memory. Only accounts persist.
+- [ ] No export or portability for account deletion requests beyond `Delete`.
+
+---
+
 ## Known issues / decisions deferred
 
 - [ ] **Trademark search for "SALVO"** before any public use. Codename only.

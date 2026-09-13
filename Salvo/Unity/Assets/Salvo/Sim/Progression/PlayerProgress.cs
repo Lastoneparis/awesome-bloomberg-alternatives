@@ -69,6 +69,46 @@ namespace Salvo.Sim
         public WeaponStats StatsFor(ContentId weapon) =>
             _weapons.TryGetValue(weapon.ToString(), out WeaponStats stats) ? stats : default;
 
+        /// <summary>Every weapon this account has a record for. For saving and for a stats screen.</summary>
+        public IReadOnlyCollection<string> WeaponIds => _weapons.Keys;
+
+        /// <summary>
+        /// Marks something unlocked without consulting a level.
+        /// </summary>
+        /// <remarks>
+        /// For loading a save, and for nothing else. An unlock a player already earned must
+        /// survive a change to the unlock table — if the level for an item is raised, someone who
+        /// had it does not lose it. That is why the saved set is authoritative on load rather
+        /// than being recomputed from the level.
+        /// </remarks>
+        public void GrantDirect(ContentId id)
+        {
+            if (!id.IsEmpty) _unlocked.Add(id.ToString());
+        }
+
+        /// <summary>
+        /// Replaces this record's contents with another's.
+        /// </summary>
+        /// <remarks>
+        /// Loading stages into a fresh instance and copies across only once the whole save has
+        /// parsed, so a save that turns out to be corrupt halfway through leaves the live record
+        /// untouched instead of half-overwritten.
+        /// </remarks>
+        public void CopyFrom(PlayerProgress other)
+        {
+            if (other == null) return;
+            AccountId = other.AccountId;
+            TotalXp = other.TotalXp;
+            Career = other.Career;
+
+            _weapons.Clear();
+            foreach (KeyValuePair<string, WeaponStats> entry in other._weapons)
+                _weapons[entry.Key] = entry.Value;
+
+            _unlocked.Clear();
+            foreach (string id in other._unlocked) _unlocked.Add(id);
+        }
+
         public void RecordWeapon(ContentId weapon, System.Func<WeaponStats, WeaponStats> update)
         {
             string key = weapon.ToString();

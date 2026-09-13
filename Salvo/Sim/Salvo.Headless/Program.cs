@@ -73,6 +73,9 @@ namespace Salvo.Headless
             // Career progress for every player, folded in as the match runs. Exercised here
             // rather than only in tests so a regression in reward accounting shows up in a run.
             var progress = new Dictionary<int, PlayerProgress>();
+            IAccountStore store = string.IsNullOrEmpty(options.SaveDirectory)
+                ? (IAccountStore)new InMemoryAccountStore()
+                : new FileAccountStore(options.SaveDirectory);
             UnlockTable unlocks = StarterContent.BuildUnlocks();
             List<string> unlockProblems = unlocks.Validate(content);
             if (unlockProblems.Count > 0)
@@ -82,7 +85,20 @@ namespace Salvo.Headless
                 return 2;
             }
             foreach (PlayerRuntime player in match.Players)
-                progress[player.Id.Raw] = new PlayerProgress { AccountId = player.Name };
+            {
+                var career = new PlayerProgress { AccountId = player.Name };
+                SaveReadResult loaded = store.Load(player.Name, career);
+                if (loaded.Status == SaveReadStatus.Corrupt || loaded.Status == SaveReadStatus.TooNew)
+                {
+                    // Loudly, and without overwriting. An account that cannot be read is not an
+                    // account to start over from — that is how somebody's career disappears.
+                    Console.Error.WriteLine(
+                        $"refusing to start {player.Name}: {loaded.Status} — {loaded.Detail}");
+                    return 2;
+                }
+                career.AccountId = player.Name;
+                progress[player.Id.Raw] = career;
+            }
 
             Console.WriteLine($"Salvo headless — {modeDefinition.Id} on {map.Id}");
             Console.WriteLine($"  seed {options.Seed}, {match.Players.Count} bots, "
@@ -105,6 +121,18 @@ namespace Salvo.Headless
 
             Report(match, stats, stopwatch.Elapsed, maxTicks);
             ReportProgression(match, progress, unlocks);
+
+            int unsaved = 0;
+            foreach (PlayerRuntime player in match.Players)
+                if (!store.Save(progress[player.Id.Raw])) unsaved++;
+            if (unsaved > 0)
+            {
+                Console.Error.WriteLine($"{unsaved} accounts failed to save");
+                return 1;
+            }
+            if (!string.IsNullOrEmpty(options.SaveDirectory))
+                Console.WriteLine($"saved {match.Players.Count} accounts to {options.SaveDirectory}");
+
             return stats.Verdict(match) ? 0 : 1;
         }
 
@@ -143,19 +171,21 @@ namespace Salvo.Headless
         {
             Console.WriteLine("--- progression --------------------------------------------");
             Console.WriteLine($"{"player",-10} {"kill",6} {"assist",7} {"objective",10} "
-                              + $"{"played",7} {"win",5} {"total",7} {"level",6} {"unlocked",9}");
+                              + $"{"played",7} {"win",5} {"total",7} {"level",6} {"unlocked",9} "
+                              + $"{"prior",7}");
 
             foreach (PlayerRuntime player in match.Players)
             {
                 MatchRewards rewards = RewardRules.Compute(match, player);
                 PlayerProgress career = progress[player.Id.Raw];
+                int matchesBefore = career.Career.MatchesPlayed;
                 career.Apply(rewards);
                 int granted = career.GrantUnlocksFor(unlocks).Count;
 
                 Console.WriteLine($"{player.Name,-10} {rewards.KillXp,6} {rewards.AssistXp,7} "
                                   + $"{rewards.ObjectiveXp,10} {rewards.ParticipationXp,7} "
                                   + $"{rewards.WinBonusXp,5} {rewards.TotalXp,7} "
-                                  + $"{career.Level,6} {granted,9}");
+                                  + $"{career.Level,6} {granted,9} {matchesBefore,7}");
             }
             Console.WriteLine();
         }

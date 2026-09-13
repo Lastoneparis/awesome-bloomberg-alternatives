@@ -135,6 +135,22 @@ jobs:
             dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --matchmaking --seed "$seed"
           done
 
+      - name: Careers survive a restart
+        if: ${{ !cancelled() }}
+        # Two runs against one save directory. The second must show accounts carrying prior
+        # matches; if persistence silently starts everyone over, the "prior" column stays zero
+        # and nothing else in the run would notice.
+        run: |
+          SAVE=$(mktemp -d)
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --save "$SAVE" --seconds 700 > /tmp/run1.txt
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --save "$SAVE" --seconds 700 > /tmp/run2.txt
+          sed -n '/--- progression/,/^$/p' /tmp/run2.txt
+          if ! awk '/^Bot[0-9]/ { if ($NF+0 > 0) found=1 } END { exit !found }' /tmp/run2.txt; then
+            echo "::error::the second run started every account from zero — careers are not persisting"
+            exit 1
+          fi
+          echo "careers carried over."
+
       - name: A match replays identically from its seed
         if: ${{ !cancelled() }}
         # Client-side prediction depends on this absolutely. The wall-clock line is excluded

@@ -14,6 +14,8 @@ namespace Salvo.Headless
   --difficulty <id>  bot.easy | bot.normal | bot.hard | bot.expert (default bot.normal)
   --seed <n>         match seed; the same seed replays identically (default 1)
   --seconds <n>      stop after this much match time (default 180)
+  --save <dir>       persist careers to this directory, so a second run continues
+                     the same accounts instead of starting from nothing
   --verbose          print kills as they happen
   --matchmaking      queue a population of parties, form matches, and check the
                      rules held across every match formed
@@ -31,6 +33,7 @@ Exits 0 if the match ran cleanly, 1 if the run found a problem, 2 on bad input."
         public uint Seed = 1;
         public float MaxSeconds = 180f;
         public bool Verbose;
+        public string SaveDirectory;
         public bool ShowHelp;
         public bool Networked;
         public bool Matchmaking;
@@ -55,6 +58,7 @@ Exits 0 if the match ran cleanly, 1 if the run found a problem, 2 on bad input."
                         options.MaxSeconds = float.TryParse(Next(), out float t) ? t : 180f;
                         break;
                     case "--verbose": options.Verbose = true; break;
+                    case "--save": options.SaveDirectory = Next(); break;
                     case "--net": options.Networked = true; break;
                     case "--matchmaking": options.Matchmaking = true; break;
                     case "--link": options.NetworkProfile = Next(); break;

@@ -139,6 +139,28 @@ namespace Salvo.Sim
             return SocialResult.Ok;
         }
 
+        /// <summary>
+        /// Re-establishes a friendship that already existed, without a request.
+        /// </summary>
+        /// <remarks>
+        /// For loading saved state, and deliberately not a general-purpose "make these two
+        /// friends". It still honours blocks: a save written before one side blocked the other
+        /// must not resurrect the friendship that block was meant to sever, and a save is not a
+        /// reason to override a decision a player made since.
+        /// </remarks>
+        public SocialResult RestoreFriendship(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return SocialResult.NotFound;
+            if (a == b) return SocialResult.Self;
+            if (IsBlockedEitherWay(a, b)) return SocialResult.Blocked;
+            if (FriendsOf(a).Count >= MaxFriends || FriendsOf(b).Count >= MaxFriends)
+                return SocialResult.ListFull;
+
+            Bucket(_friends, a).Add(b);
+            Bucket(_friends, b).Add(a);
+            return SocialResult.Ok;
+        }
+
         public SocialResult Decline(string from, string by)
         {
             if (!_outgoing.TryGetValue(from, out HashSet<string> outgoing)
