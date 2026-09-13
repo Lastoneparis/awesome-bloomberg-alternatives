@@ -564,10 +564,22 @@ final class MapIntegrityTests: XCTestCase {
     func testCollisionWorldBuildsForEveryMap() {
         // Building the grid is what actually crashed: it walks min-cell to max-cell as a
         // range, so an inverted brush is a trap rather than a harmless oddity.
+        //
+        // Queried around a spawn rather than over `map.bounds`. A whole-map query visits
+        // every cell and pushes every brush through a Set — millions of operations in an
+        // unoptimised build, to prove something a two-metre box proves just as well.
         for map in MapDatabase.all {
-            let world = CollisionWorld(map: map)
-            let candidates = world.candidates(in: map.bounds)
-            XCTAssertFalse(candidates.isEmpty, "\(map.id.value) grid found no brushes")
+            let world = MapWorldCache.world(for: map)
+            guard let spawn = map.spawns.first else {
+                XCTFail("\(map.id.value) has no spawns")
+                continue
+            }
+            let nearby = AABB(center: spawn.position + Vec3(0, 1, 0), size: Vec3(4, 4, 4))
+            XCTAssertFalse(world.candidates(in: nearby).isEmpty,
+                           "\(map.id.value): no geometry near a spawn point")
+            // And the player is standing on something.
+            XCTAssertNotNil(world.groundHeight(below: spawn.position + Vec3(0, 2, 0)),
+                            "\(map.id.value): a spawn has no floor under it")
         }
     }
 
