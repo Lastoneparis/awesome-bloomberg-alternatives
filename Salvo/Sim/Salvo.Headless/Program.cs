@@ -29,6 +29,11 @@ namespace Salvo.Headless
                 return 0;
             }
 
+            // The networked run needs the same content and the same match, but a different
+            // loop around them, so it lives in its own file rather than as a branch through
+            // this one.
+            if (options.Networked) return NetworkedRun.Run(options);
+
             GameContent content = StarterContent.Build();
 
             List<string> problems = content.Validate();
@@ -52,9 +57,7 @@ namespace Salvo.Headless
                 return 2;
             }
 
-            IGameMode mode = modeDefinition.Kind == GameModeKind.FreeForAll
-                ? (IGameMode)new FreeForAllMode(modeDefinition)
-                : new TeamDeathmatchMode(modeDefinition);
+            IGameMode mode = GameModes.Create(modeDefinition);
 
             var match = new MatchSimulation(content, map, mode, options.Seed);
             var director = new BotDirector(content, options.Seed);
@@ -79,6 +82,7 @@ namespace Salvo.Headless
                 director.Think(match, FixedClock.TickInterval);
                 match.Step();
                 stats.Observe(match, options.Verbose);
+                stats.ObserveObjective(match);
             }
             stopwatch.Stop();
 
@@ -89,20 +93,18 @@ namespace Salvo.Headless
         private static void AddBots(MatchSimulation match, GameModeDefinition mode, Options options)
         {
             int count = Math.Min(options.BotCount, mode.MaxPlayers);
-            // Weapon choice alternates so a run exercises more than one weapon's state machine.
-            ContentId[] primaries =
-            {
-                StarterContent.Weapons.Kestrel,
-                StarterContent.Weapons.Hornet,
-                StarterContent.Weapons.Anvil,
-            };
-
             for (int i = 0; i < count; i++)
             {
                 Team team = mode.IsTeamBased ? (i % 2 == 0 ? Team.Alpha : Team.Bravo) : Team.None;
-                var loadout = Loadout.Default(primaries[i % primaries.Length],
-                                              StarterContent.Weapons.Pike,
-                                              StarterContent.Weapons.Cleaver);
+                // Drawn from the map's own world, not hardcoded. Handing out the modern carbine
+                // on a 1940s map works perfectly — the simulation has no opinion about
+                // anachronism — which is exactly why it has to be got right deliberately.
+                if (!Loadouts.TryBuildDefault(match.Content, match.Map.WorldId, i, out Loadout loadout))
+                {
+                    Console.Error.WriteLine(
+                        $"world '{match.Map.WorldId}' ships no usable weapons for map {match.Map.Id}");
+                    continue;
+                }
                 match.AddPlayer($"Bot{i:D2}", team, loadout, isBot: true,
                                 botDifficulty: options.Difficulty);
             }
@@ -160,6 +162,20 @@ namespace Salvo.Headless
             Console.WriteLine($"deaths           {stats.Deaths}");
             Console.WriteLine($"footsteps        {stats.Footsteps}");
             Console.WriteLine($"distance moved   {stats.DistanceMoved:F0} m total");
+
+            if (stats.RoundOutcomes.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine("--- rounds -------------------------------------------------");
+                foreach (KeyValuePair<string, int> entry in stats.RoundOutcomes)
+                    Console.WriteLine($"{entry.Key,-28} {entry.Value}");
+                foreach (KeyValuePair<string, int> entry in stats.ObjectiveEvents)
+                    Console.WriteLine($"{entry.Key,-28} {entry.Value}");
+                Console.WriteLine($"{"attacker on site (s)",-28} "
+                                  + $"{stats.TicksWithAttackerOnSite / (float)FixedClock.TicksPerSecond:F1}");
+                Console.WriteLine($"{"attacker arming (s)",-28} "
+                                  + $"{stats.TicksArming / (float)FixedClock.TicksPerSecond:F1}");
+            }
             Console.WriteLine();
 
             foreach (string line in stats.Problems(match)) Console.WriteLine($"PROBLEM: {line}");

@@ -89,6 +89,23 @@ namespace Salvo.Sim
 
         /// <summary>Team score, for the scoreboard. Modes define what a point means.</summary>
         int TeamScore(Team team);
+
+        /// <summary>
+        /// Where this player's side should be, and whether they should be holding Use there.
+        /// </summary>
+        /// <remarks>
+        /// The mechanism that lets bots play a mode without knowing which mode it is. A bot asks
+        /// for an order and gets a position; it does not ask "am I attacking?" or check for a
+        /// bomb. Without this, every new mode would mean a new branch inside the AI, and
+        /// <see cref="BotBrain"/> would accumulate a switch over game modes — which is the same
+        /// mistake as a single giant manager, just hidden in a different file.
+        ///
+        /// <para>Returning false means "no particular orders", and a bot then falls back to
+        /// roaming. Deathmatch never issues an order, which is correct: there is nowhere in
+        /// particular to be.</para>
+        /// </remarks>
+        bool TryGetObjectiveOrder(MatchSimulation match, PlayerRuntime player,
+                                  out Vec3 position, out bool holdUse);
     }
 
     /// <summary>
@@ -160,6 +177,15 @@ namespace Salvo.Sim
         }
 
         public int TeamScore(Team team) => Scores.TryGetValue(team, out int score) ? score : 0;
+
+        /// <summary>No orders by default. A mode without objectives has nowhere to send anyone.</summary>
+        public virtual bool TryGetObjectiveOrder(MatchSimulation match, PlayerRuntime player,
+                                                 out Vec3 position, out bool holdUse)
+        {
+            position = Vec3.Zero;
+            holdUse = false;
+            return false;
+        }
 
         protected void AddScore(Team team, int amount)
         {

@@ -87,22 +87,38 @@ namespace Salvo.Sim
         public PlayerHitboxes Hitboxes => PlayerHitboxes.For(Movement);
 
         /// <summary>
-        /// The movement speed multiplier the held weapon imposes. Movement asks for this rather
-        /// than reading the loadout itself, so the movement model stays ignorant of weapons.
+        /// The movement speed multiplier for a weapon and an aim state.
         /// </summary>
-        public float SpeedMultiplier
+        /// <remarks>
+        /// Static, and shared by the server and by every predicting client, because this is
+        /// exactly the kind of small derived value that two implementations will compute
+        /// slightly differently and then disagree about forever.
+        ///
+        /// <para>It takes the aim state as a parameter rather than reading a player's current
+        /// one, and that is the whole point. A client replaying an input from six ticks ago must
+        /// use the aim state <em>of that input</em>, not whatever the player is doing now.
+        /// Aiming halves movement speed, so getting this wrong diverges client and server by
+        /// half a tick of travel on every tick where the player was aiming and is no longer, or
+        /// the reverse — which is most of a firefight.</para>
+        /// </remarks>
+        public static float SpeedMultiplierFor(WeaponDefinition weapon, bool aiming)
         {
-            get
-            {
-                WeaponDefinition weapon = HeldDefinition;
-                if (weapon == null) return 1f;
-                float multiplier = weapon.MoveSpeedMultiplier;
-                if (IsAiming) multiplier *= weapon.AdsMoveSpeedMultiplier;
-                // Reloading does not slow a player down. It is already a commitment; adding a
-                // speed penalty on top punishes the same decision twice.
-                return multiplier;
-            }
+            if (weapon == null) return 1f;
+            float multiplier = weapon.MoveSpeedMultiplier;
+            if (aiming) multiplier *= weapon.AdsMoveSpeedMultiplier;
+            // Reloading does not slow a player down. It is already a commitment; adding a
+            // speed penalty on top punishes the same decision twice.
+            return multiplier;
         }
+
+        /// <summary>The multiplier for the input this player is currently simulating.</summary>
+        public float SpeedMultiplier => SpeedMultiplierFor(HeldDefinition, IsAiming);
+
+        /// <summary>The multiplier this player would have for an arbitrary command. Used by a
+        /// predicting client when replaying its own input history.</summary>
+        public float SpeedMultiplierForInput(PlayerInput input) =>
+            SpeedMultiplierFor(ResolvedWeapons[(int)HeldSlot],
+                               input.Held(InputButtons.Aim));
 
         /// <summary>
         /// Puts the player into the world alive, with full ammunition and a fresh weapon state.

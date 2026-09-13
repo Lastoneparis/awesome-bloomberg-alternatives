@@ -48,6 +48,112 @@ matches real Unity 6. Expect to fix something on first open.
 
 ---
 
+## Phase 6 — Networking  *(simulation side complete)*
+
+### Done and verified
+- [x] Bit-level wire format with explicit field widths and quantisation
+- [x] Snapshots with delta encoding against a client-acknowledged baseline
+- [x] `SimulatedLink` — deterministic latency, jitter, loss and reordering
+- [x] Client prediction with server reconciliation and input replay
+- [x] Entity interpolation, short-way-round angles, insertion of late snapshots
+- [x] Server-side input queue: one command simulated per tick, with a 2-tick jitter buffer
+- [x] `salvo-headless --net` — a real server and real clients over a lossy link, in process
+
+Measured over a 120 s, 10-client team deathmatch:
+
+| Link | Mean error | Worst | Corrections | Downstream |
+| --- | --- | --- | --- | --- |
+| perfect | 0.001 m | 0.02 m | 0.3% | 22 kbit/s |
+| mobile (60 ms, 1% loss) | 0.008 m | 0.49 m | 9.3% | 22 kbit/s |
+| poor (150 ms, 5% loss) | 0.045 m | 1.36 m | 45% | 23 kbit/s |
+
+Error is the client's prediction against the server's result *for the same input tick* —
+not the gap between their current positions, which is latency times speed and is prediction
+working rather than failing. The budget is 64 kbit/s downstream at 10v10.
+
+### Not done
+- [ ] No real transport. `SimulatedLink` is in-process; NGO is not wired up.
+- [ ] No connection lifecycle: joining mid-match, dropping, rejoining, timing out.
+- [ ] Shots are resolved server-side with lag compensation but are **not** predicted on the
+      client, so a hit marker will lag by a round trip.
+- [ ] Snapshots carry no events. Kills, impacts and sounds are computed but never sent.
+- [ ] Nothing is encrypted or authenticated. The wire format trusts its peer entirely.
+
+---
+
+## 5v5 round objective  *(playable)*
+
+- [x] `OverloadMode` — rounds, freeze time, no respawn, arm/disarm with a fuse, elimination,
+      sides swapped at half time
+- [x] `IGameMode.TryGetObjectiveOrder` — bots play the objective without knowing which mode
+      they are in, so a new mode does not mean a new branch inside the AI
+- [x] `GameModes.Create` — one place that maps a mode kind to an implementation, and throws
+      for a kind with none rather than quietly substituting deathmatch
+- [x] Two relay sites on the starter map, with a test that a player can stand in each
+- [x] 13 tests for the round lifecycle, which had never run before this mode existed
+
+Measured over a full 13-round match, 10 bots:
+
+| Difficulty | Result | Charges armed | Attacker time on site |
+| --- | --- | --- | --- |
+| easy | 7-5 attackers | 7 | 122 s |
+| normal | 5-7 defenders | 8 | 97 s |
+| hard | 5-7 defenders | 9 | 91 s |
+| expert | 4-7 defenders | 5 | 85 s |
+
+The first site placement was 14 m from the defenders' spawn and 50 m from the attackers'.
+Every test still passed and average bots armed seven times a match, but at higher skill the
+defenders simply arrived first: attackers took one round in eight. The format is meant to
+favour defenders; a 36 m head start decides it rather than favouring it. Moved to the flanks
+near the midpoint, which is what the table above measures.
+
+### Known gaps
+- [ ] No buy phase or economy. Everyone starts each round with the same loadout.
+- [ ] Bots do not coordinate a push, hold angles, or rotate between sites — they walk to the
+      ordered position and fight whatever they meet.
+- [ ] No carried-charge model: any attacker can arm, rather than one carrying it.
+
+---
+
+## Second era  *(the architecture test)*
+
+PROJECT_PLAN.md set the bar: if adding an era requires touching the player controller, the
+design failed. It did not.
+
+- [x] `IWorldContent` — an era declares its weapons, attachments, factions, characters and
+      maps; it does not declare modes or bot difficulties, which are rules and are shared
+- [x] `WartimeWorld` — a 1940s era: five weapons, two attachments, two factions, one map
+- [x] `Loadouts.TryBuildDefault` — a loadout drawn from the map's own world
+- [x] 16 tests, including that each world validates standing alone
+
+**The diff for the whole era touched no file under `Movement/`, `Combat/`, `Modes/`, `AI/`,
+`Net/`, `Match/`, `World/`, `Math/` or `Core/`.** Only `Content/` and a new test file.
+
+It is not a reskin, and that is testable rather than asserted. The era pushes on parts of the
+data model the modern one never used:
+
+| | Modern | Wartime |
+| --- | --- | --- |
+| Mean rate of fire | 618 rpm | 305 rpm |
+| Mean damage | 27 | 43 |
+| Optics available | yes | none — the slot is simply not listed |
+| Bolt action | no | yes, with round-by-round reloading |
+| Map shape | flat, symmetric, raised centre | a pit with terraced rim |
+| Bot hit rate, same difficulty | 56% | 31% |
+
+The hit-rate gap is the data model working: iron sights and higher spread make the same bots
+measurably less accurate, with no code aware of which era it is running.
+
+### Known gaps
+- [ ] `Loadouts` picks by weapon class round-robin. There is no loadout UI, no saved
+      preference, and no per-faction restriction yet.
+- [ ] The quarry favours attackers in the objective mode (7-3) where Junction favours
+      defenders (4-7 to 5-7). Both are playable; neither has been tuned.
+- [ ] Era is content, but there is still only one `MovementTuning`. A heavier era would want
+      its own, and the type is ready for it — nothing reads it per world yet.
+
+---
+
 ## Known issues / decisions deferred
 
 - [ ] **Trademark search for "SALVO"** before any public use. Codename only.
@@ -63,8 +169,9 @@ matches real Unity 6. Expect to fix something on first open.
       be added before Phase 9.
 - [ ] `MapGeometryBuilder` emits every face, including ones buried inside neighbouring
       brushes. Correct, and wasteful; face culling belongs with the rest of the map pipeline.
-- [ ] No network transport is wired up at all. `MatchSimulation` is authoritative by
-      construction and `LagCompensation` is tested, but nothing has crossed a socket.
+- [ ] No real network transport. Prediction, reconciliation, interpolation and the wire
+      format are built and measured against a simulated lossy link, but nothing has crossed
+      a socket. NGO integration is the remaining half of Phase 6.
 
 ---
 

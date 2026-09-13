@@ -22,6 +22,10 @@ Nothing may be taken from any existing game, in any form:
 - **Characters and factions** — no names, likenesses, insignia, voice lines or backstories.
 - **UI** — no recreated layouts, no copied iconography, no lifted colour schemes.
 - **Text** — no copied strings, mode descriptions, tips or tutorial wording.
+- **Mode names** — including internal identifiers. `GameModeKind` originally had
+  `SearchAndDestroy` and `GunGame`, both names of specific existing games' modes; they are now
+  `RoundObjective` and `WeaponLadder`. An enum value is not user-facing until somebody makes it
+  so, which is not a reason to leave a borrowed name in the source.
 - **Code** — none, from any source whose licence does not permit it. Including snippets.
 
 ## What is fine
@@ -45,11 +49,27 @@ All invented for this project:
 | Weapons | Kestrel (carbine), Hornet (SMG), Anvil (shotgun), Pike (sidearm), Cleaver (melee) |
 | Factions | Meridian Company, Ashwood Collective |
 | Map | Junction |
+| Objective mode | Overload; its sites are Relay A and Relay B |
+| Wartime weapons | Warden (bolt-action), Thistle (SMG), Ridgeback (semi-auto), Kettle (sidearm), Spade (melee) |
+| Wartime factions | Ironvale Brigade, Sablewood Corps |
+| Wartime map | Quarry |
 | Teams | Alpha, Bravo — deliberately generic; the faction is content, the team is a side |
 
 The weapon names are common English nouns chosen to suggest a role rather than to resemble
 any real designation. `Team.Alpha` / `Team.Bravo` exist in the simulation precisely so that
 no faction identity is baked into the engine: a world can field any two factions it likes.
+
+## On the 1940s era specifically
+
+The wartime world is a *register*, not a depiction. No real nation, unit, insignia, place or
+weapon appears in it, and none may. The factions are invented and deliberately not analogues
+of real belligerents; the weapons are invented designations for generic archetypes (a
+bolt-action rifle, a submachine gun); the map is a stone quarry rather than a recreation of
+anywhere. `WorldDefinition.EraYear` is 1944 for sorting and UI only — no gameplay branches on
+it, and it is not a claim about history.
+
+If a future era moves closer to a real conflict, that judgement needs making deliberately and
+in the open, not arrived at one asset at a time.
 
 ## Before any public use
 

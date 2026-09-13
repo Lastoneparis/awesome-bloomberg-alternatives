@@ -47,6 +47,7 @@ namespace Salvo.Sim
         {
             public const string TeamDeathmatch = "mode.tdm";
             public const string FreeForAll = "mode.ffa";
+            public const string Overload = "mode.overload";
         }
 
         public static class Difficulties
@@ -59,26 +60,18 @@ namespace Salvo.Sim
 
         public const string MapCrossfire = "map.junction";
 
-        /// <summary>Builds the whole catalogue, ready to hand to a <see cref="MatchSimulation"/>.</summary>
-        public static GameContent Build()
+        /// <summary>
+        /// The modern era, behind the same interface every era uses.
+        /// </summary>
+        /// <remarks>
+        /// A thin adapter over the builders already in this file rather than a move of them. The
+        /// content itself did not need to change when a second era arrived, which is the claim
+        /// <see cref="IWorldContent"/> exists to make — so rewriting it to prove the point would
+        /// have undermined the point.
+        /// </remarks>
+        public sealed class ModernWorld : IWorldContent
         {
-            var weapons = new InMemoryCatalog<WeaponDefinition>();
-            foreach (WeaponDefinition weapon in BuildWeapons()) weapons.Add(weapon.Id, weapon);
-
-            var attachments = new InMemoryCatalog<AttachmentDefinition>();
-            foreach (AttachmentDefinition attachment in BuildAttachments())
-                attachments.Add(attachment.Id, attachment);
-
-            var factions = new InMemoryCatalog<FactionDefinition>();
-            var characters = new InMemoryCatalog<CharacterDefinition>();
-            BuildFactions(factions, characters);
-
-            var maps = new InMemoryCatalog<MapDefinition>();
-            MapDefinition junction = BuildJunction();
-            maps.Add(junction.Id, junction);
-
-            var worlds = new InMemoryCatalog<WorldDefinition>();
-            worlds.Add(WorldModern, new WorldDefinition
+            public WorldDefinition World => new WorldDefinition
             {
                 Id = WorldModern,
                 DisplayNameKey = "world.modern.name",
@@ -93,18 +86,53 @@ namespace Salvo.Sim
                 UiThemeKey = "theme.modern",
                 MusicKey = "music.modern",
                 AmbienceKey = "ambience.urban",
-            });
+            };
 
-            var modes = new InMemoryCatalog<GameModeDefinition>();
-            foreach (GameModeDefinition mode in BuildModes()) modes.Add(mode.Id, mode);
+            IEnumerable<WeaponDefinition> IWorldContent.Weapons() => BuildWeapons();
+            IEnumerable<AttachmentDefinition> IWorldContent.Attachments() => BuildAttachments();
 
-            var difficulties = new InMemoryCatalog<BotDifficultyDefinition>();
-            foreach (BotDifficultyDefinition difficulty in BuildDifficulties())
-                difficulties.Add(difficulty.Id, difficulty);
+            IEnumerable<FactionDefinition> IWorldContent.Factions()
+            {
+                var factions = new InMemoryCatalog<FactionDefinition>();
+                var characters = new InMemoryCatalog<CharacterDefinition>();
+                BuildFactions(factions, characters);
+                return factions.All;
+            }
 
-            return new GameContent(weapons, attachments, characters, factions, maps, worlds,
-                                   modes, difficulties);
+            IEnumerable<CharacterDefinition> IWorldContent.Characters()
+            {
+                var factions = new InMemoryCatalog<FactionDefinition>();
+                var characters = new InMemoryCatalog<CharacterDefinition>();
+                BuildFactions(factions, characters);
+                return characters.All;
+            }
+
+            IEnumerable<MapDefinition> IWorldContent.Maps() { yield return BuildJunction(); }
         }
+
+        /// <summary>Every era the game ships with. Adding one is adding a line here and a file.</summary>
+        public static IEnumerable<IWorldContent> AllWorlds()
+        {
+            yield return new ModernWorld();
+            yield return new WartimeWorld();
+        }
+
+        /// <summary>Builds the whole catalogue, ready to hand to a <see cref="MatchSimulation"/>.</summary>
+        public static GameContent Build() =>
+            ContentAssembler.Assemble(AllWorlds(), BuildModes(), BuildDifficulties());
+
+        /// <summary>
+        /// The modern era on its own.
+        /// </summary>
+        /// <remarks>
+        /// Used by tests that want to assert something about one era without a second era's
+        /// content changing the answer — and by anything that needs to prove a single world
+        /// stands up alone, since a world that only validates alongside another is not modular.
+        /// </remarks>
+        public static GameContent BuildModernOnly() =>
+            ContentAssembler.Assemble(new IWorldContent[] { new ModernWorld() },
+                                      BuildModes(), BuildDifficulties());
+
 
         // ---- weapons -------------------------------------------------------------------
 
@@ -491,6 +519,37 @@ namespace Salvo.Sim
                 StartingArmour = 0f,
                 FillWithBots = true,
             };
+
+            // The 5v5 format: rounds, no respawning inside one, an objective to attack and
+            // defend. Numbers chosen so a round is decided by play rather than by the clock —
+            // 115 s is long enough to take a site and short enough to punish stalling.
+            yield return new GameModeDefinition
+            {
+                Id = Modes.Overload,
+                DisplayNameKey = "mode.overload.name",
+                DescriptionKey = "mode.overload.description",
+                Kind = GameModeKind.RoundObjective,
+                MinPlayers = 2,
+                MaxPlayers = 10,
+                TeamSize = 5,
+                IsTeamBased = true,
+                ScoreLimit = 0,
+                TimeLimitSeconds = 0f,      // the rounds are the limit
+                RoundsToWin = 7,            // first to 7, so at most 13 rounds
+                RoundSeconds = 115f,
+                WarmupSeconds = 5f,
+                FreezeSeconds = 5f,
+                AllowsRespawn = false,
+                RespawnDelaySeconds = 0f,
+                SpawnProtectionSeconds = 0f,   // nobody spawns mid-round, so nothing to protect
+                FriendlyFire = true,           // the format's usual trade: coordination has a cost
+                HealthRegenerates = false,     // damage carries through a round; that is the tension
+                RegenDelaySeconds = 0f,
+                RegenPerSecond = 0f,
+                StartingHealth = 100f,
+                StartingArmour = 50f,
+                FillWithBots = true,
+            };
         }
 
         // ---- bot difficulties ----------------------------------------------------------
@@ -585,7 +644,10 @@ namespace Salvo.Sim
                 DisplayNameKey = "map.junction.name",
                 WorldId = WorldModern,
                 Bounds = new Aabb(new Vec3(-40f, -6f, -40f), new Vec3(40f, 26f, 40f)),
-                SupportedModes = new[] { GameModeKind.TeamDeathmatch, GameModeKind.FreeForAll },
+                SupportedModes = new[]
+                {
+                    GameModeKind.TeamDeathmatch, GameModeKind.FreeForAll, GameModeKind.RoundObjective,
+                },
                 RecommendedMinPlayers = 2,
                 RecommendedMaxPlayers = 10,
             };
@@ -644,9 +706,22 @@ namespace Salvo.Sim
             map.Spawns.Add(new SpawnPoint(new Vec3(30f, 0f, 0f), 270f));
             map.Spawns.Add(new SpawnPoint(new Vec3(0f, 2.4f, 0f), 0f));
 
-            map.Objectives.Add(new ObjectiveZone(0, "objective.junction.centre",
-                                                 new Aabb(new Vec3(-6f, 2.4f, -6f),
-                                                          new Vec3(6f, 5f, 6f))));
+            // Two relay sites on the flanks, slightly into Bravo's half so that Alpha attacks
+            // first. Placed in clear floor away from every brush above: a site a player cannot
+            // stand in is a site nobody can ever contest.
+            //
+            // The offset from centre is small on purpose. An earlier placement put them at
+            // z = 18, which is 14 m from the defenders' spawn and 50 m from the attackers'. The
+            // mode still worked — the tests passed and average bots armed seven times a match —
+            // but at higher bot skill the defenders simply arrived first and held, and the
+            // attackers took one round in eight. Round-objective formats are meant to favour
+            // the defenders; a 36 m head start is not favouring them, it is deciding it.
+            map.Objectives.Add(new ObjectiveZone(0, "objective.junction.relay_a",
+                                                 new Aabb(new Vec3(-17f, 0f, 5f),
+                                                          new Vec3(-11f, 3f, 11f))));
+            map.Objectives.Add(new ObjectiveZone(1, "objective.junction.relay_b",
+                                                 new Aabb(new Vec3(11f, 0f, 5f),
+                                                          new Vec3(17f, 3f, 11f))));
             return map;
         }
     }

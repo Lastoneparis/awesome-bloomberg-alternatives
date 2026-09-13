@@ -11,6 +11,9 @@ namespace Salvo.Sim
     {
         Spawned, Died, Damaged, Fired, Reloaded, WeaponSwitched, Footstep,
         BulletImpact, RoundStarted, RoundEnded, MatchEnded, PhaseChanged,
+        /// <summary>A mode's objective changed hands or state — armed, disarmed, captured.
+        /// The mode decides what it means; <see cref="MatchEvent.ContentId"/> names it.</summary>
+        ObjectiveChanged,
     }
 
     public struct MatchEvent
@@ -550,7 +553,11 @@ namespace Salvo.Sim
             {
                 Outcome = matchEnd;
                 SetPhase(MatchPhase.MatchEnd, 0f);
-                Emit(new MatchEvent { Kind = MatchEventKind.MatchEnded, Tick = Tick });
+                Emit(new MatchEvent
+                {
+                    Kind = MatchEventKind.MatchEnded, Tick = Tick,
+                    ContentId = matchEnd.ReasonKey, Value = (float)matchEnd.WinningTeam,
+                });
                 return;
             }
 
@@ -559,7 +566,14 @@ namespace Salvo.Sim
                 MatchOutcome roundEnd = Mode.CheckRoundEnd(this);
                 if (roundEnd.IsDecided)
                 {
-                    Emit(new MatchEvent { Kind = MatchEventKind.RoundEnded, Tick = Tick });
+                    // The reason travels with the event. Without it a round end is just "a round
+                    // ended", and neither the kill feed nor a test can tell a defused charge
+                    // from a team wiped out from a clock that ran down.
+                    Emit(new MatchEvent
+                    {
+                        Kind = MatchEventKind.RoundEnded, Tick = Tick,
+                        ContentId = roundEnd.ReasonKey, Value = (float)roundEnd.WinningTeam,
+                    });
                     SetPhase(MatchPhase.RoundEnd, 3f);
                 }
             }

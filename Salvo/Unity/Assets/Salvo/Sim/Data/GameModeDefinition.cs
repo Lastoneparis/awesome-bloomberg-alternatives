@@ -7,14 +7,27 @@ namespace Salvo.Sim
     /// tunable lives in the definition beside it, so Team Deathmatch at 50 kills and Team
     /// Deathmatch at 100 are two assets, not two classes.
     /// </summary>
+    /// <summary>
+    /// The shape of a mode, which decides which <see cref="IGameMode"/> implementation runs it.
+    /// </summary>
+    /// <remarks>
+    /// Named for what each format <em>is</em>, not for what anyone else calls it. Two of these
+    /// were originally "SearchAndDestroy" and "GunGame", both of which are names strongly
+    /// associated with specific existing games — exactly what ORIGINALITY.md says not to borrow,
+    /// and no less so for being internal identifiers rather than display strings. Neither had
+    /// been used anywhere yet, so renaming them cost nothing; leaving them would have meant
+    /// someone eventually surfacing one in a menu.
+    /// </remarks>
     public enum GameModeKind : byte
     {
         TeamDeathmatch,
         FreeForAll,
-        SearchAndDestroy,
+        /// <summary>Rounds, no respawning, an objective one side attacks and the other defends.</summary>
+        RoundObjective,
         CapturePoint,
         Domination,
-        GunGame,
+        /// <summary>Each kill advances the killer to the next weapon; first through the list wins.</summary>
+        WeaponLadder,
         TeamVersusBots,
         SoloPractice
     }

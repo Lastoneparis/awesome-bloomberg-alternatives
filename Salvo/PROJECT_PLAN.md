@@ -26,10 +26,10 @@ ranked ladders, a store. The architecture leaves room for each; none is implemen
 | --- | --- | --- | --- |
 | 1 | **Architecture + simulation core** | Sim compiles, tests pass, a full bot match runs headless | **done** — 63 tests, TDM reaches its 50-kill limit headless |
 | 2 | Unity project + player controller | Walk/run/crouch/jump/ADS on Mac and touch, 60 fps | **next** — bridge code written and shim-compiled, never opened in Unity |
-| 3 | Weapon framework | 3 weapons from data assets, no weapon-specific code | not started |
+| 3 | Weapon framework | 3 weapons from data assets, no weapon-specific code | **done in simulation** — 5 weapons, 3 attachments, no weapon-specific code |
 | 4 | First map (Modern world) | Greybox with routes, cover, spawns, validated by tooling | not started |
 | 5 | Bots | 4 difficulties, navigation, cover, objectives | partly — 4 difficulties done and measured; navigation is steering, not pathfinding |
-| 6 | Networking | Server-authoritative, prediction, reconciliation, lag comp | not started |
+| 6 | Networking | Server-authoritative, prediction, reconciliation, lag comp | **simulation side done** — measured over a lossy link; no real transport yet |
 | 7 | Lobby / matchmaking / private match | Create, invite, join, ready, start | not started |
 | 8 | Friends / parties | Add, accept, invite, block, report | not started |
 | 9 | Mobile controls | Customisable HUD, haptics, safe areas | not started |
@@ -37,8 +37,8 @@ ranked ladders, a store. The architecture leaves room for each; none is implemen
 | 11 | UI | Menus, loadout, scoreboard, results | not started |
 | 12 | Audio / VFX | Surface-aware footsteps, weapon audio, impacts | not started |
 | 13 | Performance | Quality tiers, device detection, thermal handling | not started |
-| 14 | Second world (WWII) | Proves the world system with zero engine changes | not started |
-| 15 | More maps and weapons | Content velocity test | not started |
+| 14 | Second world (WWII) | Proves the world system with zero engine changes | **done in simulation** — the era's diff touched only Content/ |
+| 15 | More maps and weapons | Content velocity test | partly — 10 weapons, 2 maps, 2 eras |
 | 16 | Progression | XP, levels, stats, challenges | not started |
 | 17 | Cosmetics | Data-driven, no gameplay effect | not started |
 | 18 | Ranked | Dedicated servers, input-based pools | not started |

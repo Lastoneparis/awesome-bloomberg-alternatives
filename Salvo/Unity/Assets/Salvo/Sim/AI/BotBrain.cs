@@ -64,6 +64,8 @@ namespace Salvo.Sim
         private float _strafeSign = 1f;
         private float _strafeAge;
         private float _triggerRestRemaining;
+        /// <summary>True when the mode's order says to hold Use once the goal is reached.</summary>
+        private bool _orderedToHoldUse;
 
         public BotBrain(BotDifficultyDefinition difficulty, uint seed)
         {
@@ -113,6 +115,19 @@ namespace Salvo.Sim
                 case BotGoal.Advance:
                     Advance(match, self, ref moveForward, ref moveRight, dt);
                     break;
+            }
+
+            // Hold Use when standing on the ordered spot. Checked outside the goal switch so a
+            // bot that is arming keeps arming while it engages someone — breaking off to shoot
+            // and losing all progress is what a bad bot does.
+            if (_orderedToHoldUse && self.Movement.IsGrounded
+                && Vec3.Distance(self.Movement.Position.Flattened, _moveGoal.Flattened) < 2.5f)
+            {
+                buttons |= InputButtons.Use;
+                // Standing still: the interaction needs the bot inside the zone, and walking out
+                // of it mid-arm would be worse than useless.
+                moveForward = 0f;
+                moveRight = 0f;
             }
 
             // Bots walk when they have nothing to chase, so that a player can hear an advancing
@@ -402,8 +417,19 @@ namespace Salvo.Sim
         {
             _goalAge = 0f;
 
-            // Objectives first, weighted by the difficulty's objective focus: a bot that ignores
-            // the objective is not "easy", it is playing a different game from the humans.
+            // The mode's orders come first, weighted by the difficulty's objective focus: a bot
+            // that ignores the objective is not "easy", it is playing a different game from the
+            // humans. The bot does not know what the order means — only where to be and whether
+            // to hold Use once there.
+            if (match.Mode.TryGetObjectiveOrder(match, self, out Vec3 ordered, out bool holdUse)
+                && _random.NextBool(_difficulty.ObjectiveFocus))
+            {
+                _moveGoal = ordered;
+                _orderedToHoldUse = holdUse;
+                return;
+            }
+            _orderedToHoldUse = false;
+
             List<ObjectiveZone> objectives = match.Map.Objectives;
             if (objectives.Count > 0 && _random.NextBool(_difficulty.ObjectiveFocus))
             {

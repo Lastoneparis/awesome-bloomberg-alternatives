@@ -86,6 +86,42 @@ jobs:
               --difficulty "$difficulty" --seconds 240 --seed 3
           done
 
+      - name: Play a networked match on every link profile
+        if: ${{ !cancelled() }}
+        # The netcode runs against latency, jitter, loss and reordering rather than on a
+        # perfect loopback, because netcode only ever tested on a perfect link has not been
+        # tested. The runner checks the per-tick prediction error, the worst correction, the
+        # bandwidth against the budget, and whether the correction rate is explained by input
+        # loss — that last one is what catches reconciliation diverging rather than converging.
+        run: |
+          for link in perfect latency jitter loss reorder mobile poor; do
+            echo "--- $link"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+              --net --bots 8 --seconds 90 --link "$link"
+          done
+
+      - name: Play the second era, on its own map, in every mode
+        if: ${{ !cancelled() }}
+        # The architecture bar from PROJECT_PLAN.md: an era is content, not code. The wartime
+        # world ships bolt-action rifles, iron sights and a map built as a pit rather than a
+        # flat arena, and the engine has no code that knows any of that exists.
+        run: |
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --map map.quarry --bots 10 --seconds 700
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --map map.quarry --mode mode.overload --bots 10 --seconds 900
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --net --map map.quarry --bots 8 --seconds 90 --link mobile
+
+      - name: Play the 5v5 round-objective mode at every difficulty
+        if: ${{ !cancelled() }}
+        # Rounds, freeze time, elimination, a carried objective and a side swap — none of which
+        # deathmatch exercises. The runner fails if a whole match passes without the objective
+        # ever being armed, which is what a site placed inside geometry looks like from outside.
+        run: |
+          for difficulty in bot.easy bot.normal bot.hard bot.expert; do
+            echo "--- $difficulty"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+              --mode mode.overload --bots 10 --seconds 900 --difficulty "$difficulty"
+          done
+
       - name: A match replays identically from its seed
         if: ${{ !cancelled() }}
         # Client-side prediction depends on this absolutely. The wall-clock line is excluded

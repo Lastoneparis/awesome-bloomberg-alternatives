@@ -36,6 +36,11 @@ namespace Salvo.Headless
         private readonly HashSet<int> _playersWhoMoved = new HashSet<int>();
         private float _maxAbsY;
 
+        /// <summary>Round outcomes by reason key, and objective events by what happened. Empty
+        /// for a mode with neither, which is the honest answer for deathmatch.</summary>
+        public readonly Dictionary<string, int> RoundOutcomes = new Dictionary<string, int>();
+        public readonly Dictionary<string, int> ObjectiveEvents = new Dictionary<string, int>();
+
         public double HitRate => ShotsFired == 0 ? 0 : (double)Hits / ShotsFired;
 
         public void Observe(MatchSimulation match, bool verbose)
@@ -56,6 +61,12 @@ namespace Salvo.Headless
                             Hits++;
                             if (matchEvent.Region == HitRegion.Head) HeadshotHits++;
                         }
+                        break;
+                    case MatchEventKind.RoundEnded:
+                        Tally(RoundOutcomes, matchEvent.ContentId.ToString());
+                        break;
+                    case MatchEventKind.ObjectiveChanged:
+                        Tally(ObjectiveEvents, matchEvent.ContentId.ToString());
                         break;
                     case MatchEventKind.Died:
                         Deaths++;
@@ -90,6 +101,45 @@ namespace Salvo.Headless
                 }
                 _lastPosition[player.Id.Raw] = position;
             }
+        }
+
+        /// <summary>Ticks on which at least one attacker stood inside a site.</summary>
+        public int TicksWithAttackerOnSite;
+        /// <summary>Ticks on which at least one attacker stood inside a site holding Use.</summary>
+        public int TicksArming;
+
+        /// <summary>
+        /// Watches whether the objective is being contested at all.
+        /// </summary>
+        /// <remarks>
+        /// Separating "nobody reached the site" from "they reached it and never pressed the
+        /// button" from "they pressed it and kept being interrupted" is the difference between
+        /// three completely different fixes — pathing, intent, and survivability. Without these
+        /// two counters all three look identical from the scoreboard.
+        /// </remarks>
+        public void ObserveObjective(MatchSimulation match)
+        {
+            if (!(match.Mode is OverloadMode overload)) return;
+
+            bool onSite = false, arming = false;
+            foreach (PlayerRuntime player in match.Players)
+            {
+                if (!player.IsAlive || player.Team != overload.Attackers) continue;
+                foreach (ObjectiveZone zone in match.Map.Objectives)
+                {
+                    if (!zone.Contains(player.Movement.Position)) continue;
+                    onSite = true;
+                    if (player.Input.Held(InputButtons.Use)) arming = true;
+                }
+            }
+            if (onSite) TicksWithAttackerOnSite++;
+            if (arming) TicksArming++;
+        }
+
+        private static void Tally(Dictionary<string, int> counts, string key)
+        {
+            counts.TryGetValue(key, out int count);
+            counts[key] = count + 1;
         }
 
         public IEnumerable<string> Problems(MatchSimulation match)
@@ -130,6 +180,14 @@ namespace Salvo.Headless
             // limits to bite. A 4-minute run of a 10-minute mode stopping early is the run
             // being cut short, not the match failing to end — and reporting it as a failure
             // would train everyone to ignore the one message that would matter.
+            // For a round-objective mode, an objective nobody ever arms is an objective that
+            // does not work — a site inside geometry, unreachable, or that bots cannot recognise.
+            // The mode's own tests prove the mechanic; this proves the map and the AI can use it.
+            if (match.Mode is OverloadMode && ObjectiveEvents.Count == 0 && RoundOutcomes.Count > 0)
+                yield return "an entire match of a round-objective mode passed without the "
+                             + "objective ever being armed — the site is unreachable, or nothing "
+                             + "is trying to take it";
+
             if (match.Phase != MatchPhase.MatchEnd
                 && _allowedSeconds >= match.Mode.Definition.TimeLimitSeconds)
                 yield return "the match never reached an ending, despite being given longer "
