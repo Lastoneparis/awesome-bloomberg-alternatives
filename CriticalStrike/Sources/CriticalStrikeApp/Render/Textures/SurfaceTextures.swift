@@ -37,6 +37,40 @@ enum SurfaceTextureFactory {
         #endif
     }
 
+    /// Large-scale variation, sampled in world space across tens of metres rather than
+    /// once per texture tile.
+    ///
+    /// A surface texture repeats every 2.5 m, so a forty-metre wall shows the same tile
+    /// sixteen times, and the eye finds that grid immediately no matter how good the tile
+    /// is. Every world material multiplies its albedo by this field at a scale no tile can
+    /// reach, which breaks the repetition for the cost of one texture fetch. It is
+    /// deliberately low-contrast: the goal is a drift in tone across a wall, not a second
+    /// pattern competing with the first.
+    static func macroVariation(size: Int = 256, seed: UInt32 = 0xACE5) -> UIImage? {
+        // Three scales, because one is not enough: broad fBm alone reads as fog drifting
+        // across the wall rather than as anything that happened to the wall. The mid band
+        // supplies the streaks and stains, and the cellular patches supply the flat-toned
+        // regions that make one stretch of concrete look like a different pour.
+        let broadPeriod = 6, midPeriod = 14, patchPeriod = 4
+        let field = ScalarField(width: size, height: size) { x, y in
+            let warped = Noise.warp(x * Float(broadPeriod), y * Float(broadPeriod),
+                                    period: broadPeriod, strength: 0.6, octaves: 2, seed: seed)
+            let broad = Noise.fbm(warped.x, warped.y, period: broadPeriod, octaves: 4,
+                                  gain: 0.55, seed: seed)
+            let mid = Noise.smoothstep(0.35, 0.72,
+                                       Noise.fbm(x * Float(midPeriod), y * Float(midPeriod),
+                                                 period: midPeriod, octaves: 3, seed: seed &+ 11))
+            let patch = Noise.cellular(x * Float(patchPeriod), y * Float(patchPeriod),
+                                       period: patchPeriod, jitter: 0.9, seed: seed &+ 5)
+            return broad * 0.52 + mid * 0.30 + patch.cellValue * 0.18
+        }
+        .normalized()
+        .mapped { 0.5 + ($0 - 0.5) * 0.9 }
+        // Radius 1, not more: blurring harder turns the streaks back into fog.
+        .blurred(radius: 1)
+        return TextureMath.grayscale(field)
+    }
+
     /// Deterministic per-surface seed, so a given surface always looks the same.
     private static func seed(for surface: SurfaceKind) -> UInt32 {
         0x5EED &+ UInt32(surface.rawValue) &* 7919

@@ -79,6 +79,34 @@ squiggles; the *boundary* between Worley cells gives a connected polygonal netwo
 how concrete actually fractures. Gating those borders by the cell value keeps the network
 broken rather than a full mesh — a fully cracked surface reads as dried mud, not a wall.
 
+## Breaking up the tiling
+
+A surface texture repeats every 2.5 metres. That is deliberate — it is what keeps texel
+density constant whether you are looking at a crate or a forty-metre wall — but it means
+that wall shows the same tile sixteen times, and the eye finds that grid immediately
+however good the tile is. It is the last thing that gives away a procedural material.
+
+So every world material carries a `.surface` shader modifier that multiplies its albedo by
+a large, soft variation map sampled in **world** space, at roughly one repeat per 55 metres
+— wider than any map in the game, so the variation map itself never visibly tiles. Because
+it is world space and not UV space, the pattern is continuous across brush boundaries: two
+walls meeting at a corner agree. Roughness is nudged the same way, which is what makes
+light travel across a wall instead of sitting flat on it. The whole thing costs one extra
+texture fetch, and one image shared by every material in the level.
+
+The map itself is three scales, and it needs all three. Broad fBm on its own reads as fog
+drifting across the wall rather than as anything that happened to the wall; the mid band
+supplies streaks and stains, and cellular patches supply the flat-toned regions that make
+one stretch of concrete look like a different pour.
+
+How much drift each surface tolerates is per-surface: dirt, grass and sand take the most,
+because real ground is never one tone, while plastic and fabric take almost none — uneven
+paint on a moulded crate reads as a rendering bug, not as weathering.
+
+The same tile, repeated 4×4, without and with it:
+
+![Macro variation](previews/macro_comparison.png)
+
 ## Sky
 
 Six cube faces, evaluated per direction, so they line up at the seams by construction.
@@ -109,6 +137,12 @@ cloud scale all came out of looking at these sheets and changing numbers.
 ![Metal](previews/surface_metal.png)
 ![Wood](previews/surface_wood.png)
 
+The macro variation map gets the same treatment — tiled 2×2 to prove it is seamless, and
+rendered side by side against an unmodulated wall to judge whether the strength is doing
+anything at all without turning into blotches:
+
+![Macro map](previews/macro_variation.png)
+
 ## Cost
 
 | | First launch | Later launches |
@@ -117,6 +151,7 @@ cloud scale all came out of looking at these sheets and changing numbers.
 | Weapon skins in the loadout | generated in parallel | read from the PNG cache |
 | Sprites and decals | generated in parallel | read from the PNG cache |
 | Sky cube map | one pass, six faces | read from the PNG cache |
+| Macro variation map | one 256² image for the level | read from the PNG cache |
 
 Generation happens during the loading screen, which is the one moment a game is allowed to
 spend CPU, and nothing touches a material afterwards — no texture is ever generated on the

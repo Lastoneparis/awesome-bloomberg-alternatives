@@ -39,6 +39,7 @@ final class MaterialLibrary {
         apply(set: set, to: material, defaultRoughness: defaultRoughness(for: surface),
               defaultMetalness: defaultMetalness(for: surface))
         configureSampling(material)
+        applyMacroVariation(to: material, surface: surface)
 
         switch surface {
         case .glass:
@@ -187,9 +188,6 @@ final class MaterialLibrary {
         material.writesToDepthBuffer = false
         material.readsFromDepthBuffer = true
         material.diffuse.mipFilter = .linear
-        // Decals sit a few millimetres off the wall; a small bias avoids z-fighting on
-        // devices with a shallower depth buffer.
-        material.shaderModifiers = nil
         cache[key] = material
         return material
     }
@@ -218,6 +216,68 @@ final class MaterialLibrary {
 
     func skyCubeMap(for environment: MapEnvironment) -> [UIImage] {
         textures.skyCubeMap(for: environment)
+    }
+
+    // MARK: - Macro variation
+
+    /// Breaks up texture tiling at a scale no tile can reach.
+    ///
+    /// Surface textures repeat every 2.5 metres so that texel density stays constant, which
+    /// means a long wall shows the same tile a dozen times and the eye locks onto the grid
+    /// however good the tile is. This multiplies the albedo by a large, soft variation map
+    /// sampled in *world* space — so the pattern is continuous across brush boundaries and
+    /// takes tens of metres to repeat — and nudges roughness the same way, which is what
+    /// makes the light move across a wall instead of sitting flat on it.
+    ///
+    /// One extra texture fetch per fragment, shared by every world material.
+    private static let macroVariationModifier = """
+    uniform sampler2D macroVariationTexture;
+    uniform float macroVariationStrength;
+    uniform float macroVariationScale;
+
+    vec3 macroWorldPosition = (u_inverseViewTransform * vec4(_surface.position, 1.0)).xyz;
+    vec2 macroCoord = macroWorldPosition.xz * macroVariationScale
+                    + vec2(macroWorldPosition.y * macroVariationScale * 0.6);
+    float macroValue = texture2D(macroVariationTexture, macroCoord).r - 0.5;
+    _surface.diffuse.rgb *= clamp(1.0 + macroValue * 2.0 * macroVariationStrength, 0.0, 2.0);
+    _surface.roughness = clamp(_surface.roughness - macroValue * 0.18, 0.03, 1.0);
+    """
+
+    private func applyMacroVariation(to material: SCNMaterial, surface: SurfaceKind) {
+        // Skipped on the low tier, where the extra fetch is not worth it, and on the
+        // transparent surfaces, where modulating albedo reads as dirt on the glass.
+        guard quality != .low, surface != .glass, surface != .water,
+              let image = textures.macroVariation() else { return }
+
+        let property = SCNMaterialProperty(contents: image)
+        property.wrapS = .repeat
+        property.wrapT = .repeat
+        property.mipFilter = .linear
+        property.minificationFilter = .linear
+        property.magnificationFilter = .linear
+
+        // The modifier goes on first: the uniform keys only exist once SceneKit has
+        // parsed the snippet that declares them.
+        material.shaderModifiers = [.surface: MaterialLibrary.macroVariationModifier]
+        material.setValue(property, forKey: "macroVariationTexture")
+        material.setValue(NSNumber(value: macroStrength(for: surface)),
+                          forKey: "macroVariationStrength")
+        // One repeat per ~55 metres, which is wider than any map, so the variation map
+        // itself never visibly tiles.
+        material.setValue(NSNumber(value: Float(0.018)), forKey: "macroVariationScale")
+    }
+
+    /// How much drift each surface tolerates. Ground surfaces take the most — real dirt
+    /// and grass are never one tone — while manufactured surfaces take very little,
+    /// because uneven paint on a plastic crate reads as a rendering bug.
+    private func macroStrength(for surface: SurfaceKind) -> Float {
+        switch surface {
+        case .dirt, .grass, .sand: return 0.22
+        case .concrete, .wood: return 0.18
+        case .metal, .tile: return 0.10
+        case .plastic, .fabric: return 0.07
+        default: return 0.12
+        }
     }
 
     // MARK: - Shared setup

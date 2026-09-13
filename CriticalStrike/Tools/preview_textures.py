@@ -521,6 +521,77 @@ def render_sheet(name, size, tiles=2):
     return full, out
 
 
+def macro_field(size, seed=0xACE5):
+    """Mirror of SurfaceTextureFactory.macroVariation, including the blur."""
+    broad_p, mid_p, patch_p = 6, 14, 4
+    raw = []
+    for y in range(size):
+        ny = y / float(size)
+        row = []
+        for x in range(size):
+            nx = x / float(size)
+            wx, wy = warp(nx * broad_p, ny * broad_p, broad_p, 0.6, 2, seed)
+            broad = fbm(wx, wy, broad_p, 4, gain=0.55, seed=seed)
+            mid = smoothstep(0.35, 0.72,
+                             fbm(nx * mid_p, ny * mid_p, mid_p, 3, seed=(seed + 11) & MASK))
+            _, _, patch = cellular(nx * patch_p, ny * patch_p, patch_p, 0.9, (seed + 5) & MASK)
+            row.append(broad * 0.52 + mid * 0.30 + patch * 0.18)
+        raw.append(row)
+
+    lo = min(min(r) for r in raw)
+    hi = max(max(r) for r in raw)
+    span = (hi - lo) if hi - lo > 1e-6 else 1.0
+    raw = [[0.5 + ((v - lo) / span - 0.5) * 0.9 for v in row] for row in raw]
+
+    # Separable box blur, wrapping, radius 1 — same as ScalarField.blurred.
+    radius, window = 1, 3.0
+    horizontal = [[sum(row[(x + o) % size] for o in range(-radius, radius + 1)) / window
+                   for x in range(size)] for row in raw]
+    return [[sum(horizontal[(y + o) % size][x] for o in range(-radius, radius + 1)) / window
+             for x in range(size)] for y in range(size)]
+
+
+def render_macro_sheet(size, tiles=2):
+    field = macro_field(size)
+    full = size * tiles
+    out = bytearray(full * full * 4)
+    for y in range(full):
+        for x in range(full):
+            v = int(clamp(field[y % size][x % size], 0, 1) * 255)
+            index = (y * full + x) * 4
+            out[index] = out[index + 1] = out[index + 2] = v
+            out[index + 3] = 255
+    return full, out
+
+
+def render_macro_comparison(name, tile, repeats=4, strength=0.18):
+    """The actual point of the macro map: the same surface tiled with and without it.
+
+    Left half is the raw tile repeated, which is how the wall used to read. Right half is
+    the same tile with world-space variation multiplied in. If the change is working, the
+    grid you can count on the left is gone on the right.
+    """
+    generator, seed = SURFACES[name]
+    tile_pixels = [[generator(x / float(tile), y / float(tile), seed)
+                    for x in range(tile)] for y in range(tile)]
+
+    side = tile * repeats
+    macro = macro_field(side)
+    width = side * 2
+    out = bytearray(width * side * 4)
+    for y in range(side):
+        for x in range(side):
+            colour = tile_pixels[y % tile][x % tile]
+            shade = 1.0 + (macro[y][x] - 0.5) * 2.0 * strength
+            for half, factor in ((0, 1.0), (side, shade)):
+                index = (y * width + x + half) * 4
+                out[index] = int(clamp(colour[0] * factor, 0, 1) * 255)
+                out[index + 1] = int(clamp(colour[1] * factor, 0, 1) * 255)
+                out[index + 2] = int(clamp(colour[2] * factor, 0, 1) * 255)
+                out[index + 3] = 255
+    return width, side, out
+
+
 def main():
     output = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Docs", "previews")
@@ -535,6 +606,14 @@ def main():
         width, height = 480, 160
         write_png(os.path.join(output, f"sky_{name}.png"), width, height,
                   render_sky_panorama(name, width, height))
+
+    print("rendering macro variation …", flush=True)
+    full, pixels = render_macro_sheet(192)
+    write_png(os.path.join(output, "macro_variation.png"), full, full, pixels)
+
+    print("rendering macro comparison …", flush=True)
+    width, height, pixels = render_macro_comparison("concrete", 96)
+    write_png(os.path.join(output, "macro_comparison.png"), width, height, pixels)
 
     print("rendering decals …", flush=True)
     kinds = ["bullet_hole_hard", "bullet_hole_metal", "glass_crack", "blood_splat"]

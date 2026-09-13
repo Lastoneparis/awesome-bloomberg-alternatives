@@ -23,6 +23,7 @@ final class TextureLibrary: @unchecked Sendable {
     private var spriteCache: [SpriteKind: UIImage] = [:]
     private var decalCache: [DecalKind: UIImage] = [:]
     private var skyCache: [String: [UIImage]] = [:]
+    private var macroCache: UIImage?
     private let lock = NSLock()
 
     private let diskCacheURL: URL?
@@ -131,6 +132,28 @@ final class TextureLibrary: @unchecked Sendable {
         return image
     }
 
+    /// The world-space variation map every surface material multiplies its albedo by.
+    /// One image, shared by every material in the level.
+    func macroVariation() -> UIImage? {
+        lock.lock()
+        if let cached = macroCache {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let size = min(surfaceSize, 256)
+        let image = loadOrMakeImage(key: "macro_variation", size: size) {
+            SurfaceTextureFactory.macroVariation(size: size)
+        }
+        if let image {
+            lock.lock()
+            macroCache = image
+            lock.unlock()
+        }
+        return image
+    }
+
     func skyCubeMap(for environment: MapEnvironment) -> [UIImage] {
         let key = "sky_\(environment.skyName)_\(Int(environment.sunDirection.x * 10))"
             + "_\(Int(environment.sunDirection.y * 10))_\(Int(environment.sunDirection.z * 10))"
@@ -190,7 +213,7 @@ final class TextureLibrary: @unchecked Sendable {
         }
 
         let totalSteps = surfaces.count + skins.count + SpriteKind.allCases.count
-            + DecalKind.allCases.count + 6
+            + DecalKind.allCases.count + 6 + 1
         let counter = ProgressCounter(total: totalSteps, report: progress)
 
         await withTaskGroup(of: Void.self) { group in
@@ -221,6 +244,10 @@ final class TextureLibrary: @unchecked Sendable {
             group.addTask { [self] in
                 _ = skyCubeMap(for: map.environment)
                 for _ in 0..<6 { await counter.advance() }
+            }
+            group.addTask { [self] in
+                _ = macroVariation()
+                await counter.advance()
             }
         }
         progress(1)
