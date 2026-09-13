@@ -171,15 +171,51 @@ simulating. That validation lives in `Sim/Net` so the tests can attack it direct
 ## 6. What is verified, and what is not
 
 This environment has the .NET SDK but **cannot install Unity** (the download host is
-blocked by the network policy, and the Editor needs a licence). Therefore:
+blocked by the network policy, and the Editor needs a licence). So the honest split is:
 
-- ✅ Everything in `Sim/` compiles and its tests run, here and in CI.
-- ✅ `Salvo.Headless` plays a full match with no engine, which is how the gameplay loop is
-  exercised before any art exists.
-- ❌ Nothing under `Runtime/` has been compiled. It is written against Unity 6 APIs and
-  must be opened in the Editor.
-- ❌ No scene or prefab is hand-authored. Hand-written `.unity` YAML rots and hides
-  mistakes; the prototype scene is **built by code** from an Editor menu item instead, so
-  it is reviewable as source.
+### Verified by running it
 
-Anything below that line is stated as untested wherever it appears.
+- ✅ Everything in `Sim/` compiles under `netstandard2.1` with warnings as errors, and its
+  63 tests pass — here and in CI.
+- ✅ `Salvo.Headless` plays a full team deathmatch to its own 50-kill limit with no engine,
+  in about 3.7 s of wall clock for 370 s of match time. It exits non-zero if nobody moved,
+  nobody fired, nothing was hit, nobody died, or anyone left the map, so CI fails on a
+  regression that leaves bots standing in their spawn rather than passing quietly.
+- ✅ The same match replays identically from its seed. Client-side prediction depends on
+  this absolutely, and CI diffs two runs to prove it.
+- ✅ Bot difficulty differentiates: measured hit rates of 33% / 47% / 55% / 79% across
+  Easy → Expert, with damage per landed hit flat. A test asserts both halves.
+
+### Verified only as far as "it is valid C# that agrees with the simulation"
+
+- ⚠️ `Unity/Assets/Salvo/Runtime/` and `Editor/` compile via `Sim/Salvo.Bridge.Check`,
+  which builds those exact source files against a stub `UnityEngine` in
+  `Sim/Salvo.UnityShim`.
+
+  This catches the failure that will actually happen — a rename in `Sim` silently breaking
+  the bridge — and it was confirmed to catch it by deliberately renaming
+  `MatchSimulation.Start` and watching the build fail with a file and line. It found two
+  real bugs when first run: a generic call whose type arguments could not be inferred, and
+  a static method referring to an instance member.
+
+  It does **not** prove the code matches real Unity. The shim was written from memory of
+  Unity's API; where that memory is wrong, the shim is wrong the same way and the build
+  passes regardless. Expect to fix something on first open. It will be smaller than it
+  would have been.
+
+### Not verified at all
+
+- ❌ Nothing has run inside Unity. Not one frame, not one `Start()`.
+- ❌ No scene or prefab exists. Hand-written `.unity` YAML rots, conflicts on every parallel
+  edit, and hides mistakes behind GUIDs; the prototype scene is **built by code** from an
+  Editor menu item instead, so it is reviewable as source. That menu item has never run.
+- ❌ No network transport is wired up. `MatchSimulation` is authoritative by construction —
+  the only way intent enters it is `SubmitInput`, which accepts a command and nothing else —
+  and `LagCompensation` is tested against synthetic history. But nothing has crossed a
+  socket, and "authoritative by construction" is a claim about the shape of the code, not a
+  measurement.
+- ❌ No performance number in `PROJECT_PLAN.md` has been measured on a device. They are
+  budgets, not results.
+
+Anything in this repository that falls below the first heading is marked as untested
+wherever it appears. `TODO.md` uses `[~]` for exactly this.

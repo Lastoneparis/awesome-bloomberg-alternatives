@@ -24,11 +24,11 @@ ranked ladders, a store. The architecture leaves room for each; none is implemen
 
 | # | Phase | Definition of done | Status |
 | --- | --- | --- | --- |
-| 1 | **Architecture + simulation core** | Sim compiles, tests pass, a full bot match runs headless | **in progress** |
-| 2 | Unity project + player controller | Walk/run/crouch/jump/ADS on Mac and touch, 60 fps | not started |
+| 1 | **Architecture + simulation core** | Sim compiles, tests pass, a full bot match runs headless | **done** — 63 tests, TDM reaches its 50-kill limit headless |
+| 2 | Unity project + player controller | Walk/run/crouch/jump/ADS on Mac and touch, 60 fps | **next** — bridge code written and shim-compiled, never opened in Unity |
 | 3 | Weapon framework | 3 weapons from data assets, no weapon-specific code | not started |
 | 4 | First map (Modern world) | Greybox with routes, cover, spawns, validated by tooling | not started |
-| 5 | Bots | 4 difficulties, navigation, cover, objectives | not started |
+| 5 | Bots | 4 difficulties, navigation, cover, objectives | partly — 4 difficulties done and measured; navigation is steering, not pathfinding |
 | 6 | Networking | Server-authoritative, prediction, reconciliation, lag comp | not started |
 | 7 | Lobby / matchmaking / private match | Create, invite, join, ready, start | not started |
 | 8 | Friends / parties | Add, accept, invite, block, report | not started |

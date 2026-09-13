@@ -63,7 +63,7 @@ namespace Salvo.Headless
             match.Start();
             // Drained straight away: Start() emits the initial spawns and the next Step() will
             // clear them.
-            var stats = new RunStatistics();
+            var stats = new RunStatistics(options.MaxSeconds);
             stats.Observe(match, options.Verbose);
 
             Console.WriteLine($"Salvo headless — {modeDefinition.Id} on {map.Id}");
@@ -139,7 +139,8 @@ namespace Salvo.Headless
                         ? $"draw ({match.Outcome.ReasonKey})"
                         : $"{match.Outcome.WinningTeam} wins ({match.Outcome.ReasonKey})"
                 : match.Tick >= maxTicks
-                    ? "stopped at the tick limit — the match did not reach its own ending"
+                    ? $"stopped after the requested {match.ElapsedSeconds:F0}s, before the "
+                      + "match reached its own ending"
                     : "undecided";
 
             Console.WriteLine($"result: {ending}");

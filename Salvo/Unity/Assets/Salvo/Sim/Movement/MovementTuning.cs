@@ -1,3 +1,5 @@
+using System;
+
 namespace Salvo.Sim
 {
     /// <summary>
@@ -7,6 +9,7 @@ namespace Salvo.Sim
     /// (see <see cref="CharacterDefinition"/>) — every player on the server moves by the same
     /// rules, or the game is pay-to-win.
     /// </summary>
+    [Serializable]
     public class MovementTuning
     {
         /// <summary>Metres per second on flat ground at full stick.</summary>

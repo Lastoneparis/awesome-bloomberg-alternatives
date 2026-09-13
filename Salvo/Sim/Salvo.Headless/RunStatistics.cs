@@ -25,6 +25,12 @@ namespace Salvo.Headless
         public double DistanceMoved;
         public int HeadshotHits;
 
+        /// <summary>How long the run was allowed to last. Needed to tell "this match cannot
+        /// end" from "this run was stopped early", which look identical from the outside.</summary>
+        private readonly float _allowedSeconds;
+
+        public RunStatistics(float allowedSeconds) { _allowedSeconds = allowedSeconds; }
+
         private readonly Dictionary<int, Vec3> _lastPosition = new Dictionary<int, Vec3>();
         private readonly HashSet<int> _playersWhoFired = new HashSet<int>();
         private readonly HashSet<int> _playersWhoMoved = new HashSet<int>();
@@ -120,8 +126,14 @@ namespace Salvo.Headless
                 yield return $"a player reached y={_maxAbsY:F1}, far outside the map — the "
                              + "collision or movement model let someone escape";
 
-            if (match.Phase != MatchPhase.MatchEnd)
-                yield return "the match never reached an ending within the time limit";
+            // Only a problem when the run was actually given long enough for the mode's own
+            // limits to bite. A 4-minute run of a 10-minute mode stopping early is the run
+            // being cut short, not the match failing to end — and reporting it as a failure
+            // would train everyone to ignore the one message that would matter.
+            if (match.Phase != MatchPhase.MatchEnd
+                && _allowedSeconds >= match.Mode.Definition.TimeLimitSeconds)
+                yield return "the match never reached an ending, despite being given longer "
+                             + $"than its own {match.Mode.Definition.TimeLimitSeconds:F0}s time limit";
         }
 
         /// <summary>True when the run found nothing wrong.</summary>

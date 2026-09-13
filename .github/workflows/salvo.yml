@@ -1,0 +1,102 @@
+name: Salvo
+
+# Salvo is the Unity FPS under Salvo/. It has its own workflow rather than sharing one with
+# CriticalStrike/ (the earlier Swift project) because they have nothing in common: different
+# language, different toolchain, different runner. One workflow doing both would mean every
+# Swift change waited on a .NET build and vice versa.
+on:
+  push:
+    paths:
+      - 'Salvo/**'
+      - '.github/workflows/salvo.yml'
+  pull_request:
+    paths:
+      - 'Salvo/**'
+      - '.github/workflows/salvo.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: salvo-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: Salvo/Sim
+
+jobs:
+  simulation:
+    name: Simulation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build the simulation
+        # netstandard2.1 with warnings as errors. The target framework is the guardrail: if
+        # this compiles, Unity can consume it, and anything that would not compile in Unity
+        # fails here instead of in someone's editor.
+        run: dotnet build Salvo.Sim.csproj -c Release --nologo
+
+      - name: Test the simulation
+        if: ${{ !cancelled() }}
+        run: dotnet test Salvo.Sim.Tests/Salvo.Sim.Tests.csproj -c Release --nologo --logger "console;verbosity=normal"
+
+      - name: Check the Unity bridge compiles
+        if: ${{ !cancelled() }}
+        # Compiles Unity/Assets/Salvo/{Runtime,Editor} against a stub UnityEngine. It does not
+        # prove the code matches real Unity (see Salvo.UnityShim/README.md), but it does prove
+        # the bridge is consistent C# and that every Salvo.Sim member it names still exists —
+        # which is what actually breaks when the simulation is refactored.
+        run: dotnet build Salvo.Bridge.Check/Salvo.Bridge.Check.csproj -c Release --nologo
+
+  playable:
+    name: Plays a match
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Play a full team deathmatch
+        # The real check that this is a game and not just a library that compiles. The runner
+        # exits non-zero if nobody moved, nobody shot, nobody was hit, nobody died, or anyone
+        # left the map — so a regression that leaves bots standing in their spawn fails CI
+        # rather than passing quietly.
+        run: dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --seconds 700
+
+      - name: Play a free-for-all
+        if: ${{ !cancelled() }}
+        run: dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --mode mode.ffa --bots 6 --seconds 600
+
+      - name: Play at every bot difficulty
+        if: ${{ !cancelled() }}
+        # Each difficulty is a separate content path through the bot code, and an Expert bot
+        # exercises timings an Easy one never reaches.
+        run: |
+          for difficulty in bot.easy bot.normal bot.hard bot.expert; do
+            echo "--- $difficulty"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+              --difficulty "$difficulty" --seconds 240 --seed 3
+          done
+
+      - name: A match replays identically from its seed
+        if: ${{ !cancelled() }}
+        # Client-side prediction depends on this absolutely. The wall-clock line is excluded
+        # because it is the one part of the output that is legitimately allowed to differ.
+        run: |
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+            --seed 4242 --seconds 240 | grep -v 'wall clock' > /tmp/run-a.txt
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+            --seed 4242 --seconds 240 | grep -v 'wall clock' > /tmp/run-b.txt
+          if ! diff -u /tmp/run-a.txt /tmp/run-b.txt; then
+            echo "::error::the same seed produced two different matches — prediction is impossible"
+            exit 1
+          fi
+          echo "identical."

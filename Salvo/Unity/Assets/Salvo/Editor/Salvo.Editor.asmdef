@@ -1,0 +1,19 @@
+{
+    "name": "Salvo.Editor",
+    "rootNamespace": "Salvo.Editor",
+    "references": [
+        "Salvo.Sim",
+        "Salvo.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
