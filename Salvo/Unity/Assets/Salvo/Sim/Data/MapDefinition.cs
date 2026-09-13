@@ -41,10 +41,21 @@ namespace Salvo.Sim
             point.Y >= Min.Y && point.Y <= Max.Y &&
             point.Z >= Min.Z && point.Z <= Max.Z;
 
+        /// <summary>
+        /// True when the two boxes share actual volume.
+        /// </summary>
+        /// <remarks>
+        /// Strict comparisons, so boxes that merely share a face do not intersect. That is the
+        /// physically meaningful answer — the shared volume is zero — and it is the one the
+        /// callers need: the overlap test is what decides "is this body embedded in the level",
+        /// and a player standing on a floor touches it by definition. With inclusive
+        /// comparisons every spawn point on the ground reads as buried in the ground, and no
+        /// crouched player can ever stand up.
+        /// </remarks>
         public bool Intersects(Aabb other) =>
-            Min.X <= other.Max.X && Max.X >= other.Min.X &&
-            Min.Y <= other.Max.Y && Max.Y >= other.Min.Y &&
-            Min.Z <= other.Max.Z && Max.Z >= other.Min.Z;
+            Min.X < other.Max.X && Max.X > other.Min.X &&
+            Min.Y < other.Max.Y && Max.Y > other.Min.Y &&
+            Min.Z < other.Max.Z && Max.Z > other.Min.Z;
 
         public Aabb Expanded(Vec3 amount) => new Aabb(Min - amount, Max + amount);
 
