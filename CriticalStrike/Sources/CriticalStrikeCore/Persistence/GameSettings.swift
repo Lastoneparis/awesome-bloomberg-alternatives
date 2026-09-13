@@ -66,7 +66,9 @@ public enum FrameRateCap: Int, Codable, CaseIterable, Sendable {
     public var displayName: String { "\(rawValue) FPS" }
 }
 
-public enum FireMode2: String, Codable, CaseIterable, Sendable {
+/// How the fire button behaves. Named for the trigger rather than the weapon so it never
+/// reads as the weapon's own `FireMode` (auto / semi / burst).
+public enum TriggerMode: String, Codable, CaseIterable, Sendable {
     /// Tap the fire button to shoot.
     case manual
     /// Shoots automatically when the crosshair is over an enemy — the standard mobile
@@ -159,7 +161,7 @@ public struct GameSettings: Codable, Equatable, Sendable {
     public var gyroEnabled: Bool
     public var gyroSensitivity: Float
     public var invertY: Bool
-    public var fireMode: FireMode2
+    public var triggerMode: TriggerMode
     public var aimAssist: AimAssistLevel
     public var autoSprint: Bool
     public var autoReload: Bool
@@ -208,7 +210,7 @@ public struct GameSettings: Codable, Equatable, Sendable {
         gyroEnabled = false
         gyroSensitivity = 1.0
         invertY = false
-        fireMode = .autoFire
+        triggerMode = .autoFire
         aimAssist = .standard
         autoSprint = true
         autoReload = true

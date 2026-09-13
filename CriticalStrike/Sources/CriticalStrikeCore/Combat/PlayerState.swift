@@ -258,7 +258,7 @@ public struct PlayerState: Codable, Sendable {
         defuseProgress = 0
         invulnerableUntil = now + mode.respawnInvulnerability
         pendingDamageCredits.removeAll(keepingCapacity: true)
-        for slot in slots.keys {
+        for slot in Array(slots.keys) {
             if var s = slots[slot] {
                 let w = s.resolvedWeapon
                 s.ammoInMagazine = w.magazineSize

@@ -23,7 +23,7 @@ final class WebSocketTransport: NSObject, NetTransport {
     private var task: URLSessionWebSocketTask?
     private var handshakeCompleted = false
     private var reconnectAttempt = 0
-    private var pingTimer: Timer?
+    private var pingTimer: Foundation.Timer?
     private let endpoint: URL
     private let authToken: String
 
@@ -117,7 +117,7 @@ final class WebSocketTransport: NSObject, NetTransport {
     /// WebSocket keep-alive. Carriers will silently drop an idle socket in about 30s.
     private func startKeepAlive() {
         pingTimer?.invalidate()
-        pingTimer = Timer.scheduledTimer(withTimeInterval: 12, repeats: true) { [weak self] _ in
+        pingTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 12, repeats: true) { [weak self] _ in
             self?.task?.sendPing { error in
                 if let error {
                     Log.warn("Keep-alive ping failed: \(error)", category: "net")

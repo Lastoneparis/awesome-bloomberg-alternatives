@@ -21,7 +21,7 @@ struct CriticalStrikeApp: App {
                 .persistentSystemOverlays(.hidden)
                 .onAppear { app.start() }
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { phase in
             switch phase {
             case .active: app.didBecomeActive()
             case .inactive: app.willResignActive()

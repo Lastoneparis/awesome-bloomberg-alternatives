@@ -202,7 +202,8 @@ public final class GameServer {
     private func broadcastSnapshots() {
         guard let transport else { return }
         let snapshot = WorldSnapshot(from: sim)
-        for (peer, var client) in clients {
+        for (peer, storedClient) in clients {
+            var client = storedClient
             let data = SnapshotCodec.encode(snapshot, baseline: client.baseline, bounds: sim.map.bounds)
             transport.send(data, to: peer, reliable: false)
             // The baseline only advances once the client acknowledges it.

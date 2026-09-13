@@ -130,7 +130,7 @@ public enum MapDatabase {
                          ObjectiveZone(index: 2, name: "B Site", center: Vec3(-30, 0, 26), radius: 7),
                          ObjectiveZone(index: 3, name: "Market", center: Vec3(-8, 0, -34), radius: 6)],
             pickups: a.pickups, callouts: a.callouts,
-            supportedModes: GameModeKind.allCases, recommendedPlayers: 8...10)
+            supportedModes: GameModeKind.allCases, recommendedPlayers: PlayerRange(8, 10))
     }()
 
     // ══════════════════════════════════════════════════════════════════════
@@ -231,7 +231,7 @@ public enum MapDatabase {
                          ObjectiveZone(index: 1, name: "A Platform", center: Vec3(24, 3.5, -25), radius: 6),
                          ObjectiveZone(index: 2, name: "B Floor", center: Vec3(-24, 0, 24), radius: 6)],
             pickups: a.pickups, callouts: a.callouts,
-            supportedModes: GameModeKind.allCases, recommendedPlayers: 8...10)
+            supportedModes: GameModeKind.allCases, recommendedPlayers: PlayerRange(8, 10))
     }()
 
     // ══════════════════════════════════════════════════════════════════════
@@ -320,7 +320,7 @@ public enum MapDatabase {
                          ObjectiveZone(index: 2, name: "South Street", center: Vec3(0, 0, 24), radius: 6),
                          ObjectiveZone(index: 3, name: "West Block", center: Vec3(-24, 0, 0), radius: 6)],
             pickups: a.pickups, callouts: a.callouts,
-            supportedModes: GameModeKind.allCases, recommendedPlayers: 8...12)
+            supportedModes: GameModeKind.allCases, recommendedPlayers: PlayerRange(8, 12))
     }()
 
     // ══════════════════════════════════════════════════════════════════════
@@ -398,7 +398,7 @@ public enum MapDatabase {
             pickups: a.pickups, callouts: a.callouts,
             supportedModes: [.teamDeathmatch, .freeForAll, .gunGame, .oneInTheChamber,
                              .killConfirmed, .hardpoint, .domination, .zombies, .training],
-            recommendedPlayers: 4...8)
+            recommendedPlayers: PlayerRange(4, 8))
     }()
 
     // ══════════════════════════════════════════════════════════════════════
@@ -485,6 +485,6 @@ public enum MapDatabase {
                          ObjectiveZone(index: 2, name: "East Tower", center: Vec3(26, 0, -18), radius: 6),
                          ObjectiveZone(index: 3, name: "Cabins", center: Vec3(-4, 0, 15), radius: 6)],
             pickups: a.pickups, callouts: a.callouts,
-            supportedModes: GameModeKind.allCases, recommendedPlayers: 8...12)
+            supportedModes: GameModeKind.allCases, recommendedPlayers: PlayerRange(8, 12))
     }()
 }

@@ -8,11 +8,19 @@ import CriticalStrikeCore
 /// `Button` because a shooter needs press-and-hold semantics and zero tap delay.
 struct TouchControlsView: View {
     @ObservedObject var session: GameSession
+    /// Observed separately: button highlight state lives on the controls object, and
+    /// without this the pressed states would never redraw.
+    @ObservedObject var controls: TouchControls
     let size: CGSize
     @EnvironmentObject private var app: AppState
 
+    init(session: GameSession, size: CGSize) {
+        self.session = session
+        self.controls = session.controls
+        self.size = size
+    }
+
     private var settings: GameSettings { app.profile.settings }
-    private var controls: TouchControls { session.controls }
     private var hud: HUDState { session.hud }
 
     var body: some View {

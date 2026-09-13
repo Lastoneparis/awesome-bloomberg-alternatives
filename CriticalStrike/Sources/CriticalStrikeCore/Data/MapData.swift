@@ -172,7 +172,7 @@ public struct MapData: Codable, Identifiable, Sendable {
     public var pickups: [PickupSpawn]
     public var callouts: [Callout]
     public var supportedModes: [GameModeKind]
-    public var recommendedPlayers: ClosedRange<Int>
+    public var recommendedPlayers: PlayerRange
 
     public init(id: MapID, name: String, summary: String, previewImage: String = "",
                 bounds: AABB, environment: MapEnvironment = MapEnvironment(),
@@ -181,7 +181,7 @@ public struct MapData: Codable, Identifiable, Sendable {
                 capturePoints: [ObjectiveZone] = [], hardpoints: [ObjectiveZone] = [],
                 navNodes: [NavNode] = [], pickups: [PickupSpawn] = [], callouts: [Callout] = [],
                 supportedModes: [GameModeKind] = GameModeKind.allCases,
-                recommendedPlayers: ClosedRange<Int> = 6...10) {
+                recommendedPlayers: PlayerRange = PlayerRange(6, 10)) {
         self.id = id; self.name = name; self.summary = summary
         self.previewImage = previewImage.isEmpty ? "img_map_\(id.value)" : previewImage
         self.bounds = bounds; self.environment = environment
@@ -210,17 +210,19 @@ public struct MapData: Codable, Identifiable, Sendable {
     }
 }
 
-extension ClosedRange: @retroactive Codable where Bound: Codable {
-    private enum CodingKeys: String, CodingKey { case lower, upper }
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        let lo = try c.decode(Bound.self, forKey: .lower)
-        let hi = try c.decode(Bound.self, forKey: .upper)
-        self = lo...hi
+/// A recommended player count. A plain `ClosedRange` would need a retroactive Codable
+/// conformance on a standard library type, which is exactly the kind of thing that breaks
+/// when the standard library adds its own.
+public struct PlayerRange: Codable, Equatable, Sendable {
+    public var minimum: Int
+    public var maximum: Int
+
+    public init(_ minimum: Int, _ maximum: Int) {
+        self.minimum = Swift.min(minimum, maximum)
+        self.maximum = Swift.max(minimum, maximum)
     }
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(lowerBound, forKey: .lower)
-        try c.encode(upperBound, forKey: .upper)
-    }
+
+    public func contains(_ value: Int) -> Bool { value >= minimum && value <= maximum }
+    public var asRange: ClosedRange<Int> { minimum...maximum }
+    public var description: String { "\(minimum)-\(maximum)" }
 }

@@ -139,7 +139,7 @@ final class TouchControls: ObservableObject {
         // Auto fire: the standard mobile assist. Only fires when the crosshair is actually
         // on a target and the weapon is ready — never a blind trigger hold.
         var firing = isFiring
-        switch settings.fireMode {
+        switch settings.triggerMode {
         case .manual:
             break
         case .autoFire:

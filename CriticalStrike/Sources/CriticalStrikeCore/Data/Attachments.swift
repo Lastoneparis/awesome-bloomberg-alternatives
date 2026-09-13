@@ -122,7 +122,7 @@ public enum AttachmentDatabase {
         AttachmentData(id: "grp_vertical", name: "Vertical Grip", slot: .grip, rarity: .common,
                        unlockKills: 12, storeCostCoins: 3000,
                        description: "Steadier vertical recoil while aiming.",
-                       recoilVerticalScale: 0.85, adsTimeScale: 1.03),
+                       adsTimeScale: 1.03, recoilVerticalScale: 0.85),
         AttachmentData(id: "grp_angled", name: "Angled Grip", slot: .grip, rarity: .uncommon,
                        unlockKills: 50, storeCostCoins: 6000,
                        description: "Snap to target faster, slightly looser spray.",
@@ -136,11 +136,11 @@ public enum AttachmentDatabase {
         AttachmentData(id: "stk_tactical", name: "Tactical Stock", slot: .stock, rarity: .common,
                        unlockKills: 18, storeCostCoins: 3500,
                        description: "Faster recoil recovery and steadier aim.",
-                       recoilVerticalScale: 0.9, adsSpreadScale: 0.92),
+                       adsSpreadScale: 0.92, recoilVerticalScale: 0.9),
         AttachmentData(id: "stk_light", name: "Skeleton Stock", slot: .stock, rarity: .uncommon,
                        unlockKills: 55, storeCostCoins: 6000,
                        description: "Move faster, aim less steadily.",
-                       adsTimeScale: 0.9, moveSpeedScale: 1.06, recoilVerticalScale: 1.08),
+                       adsTimeScale: 0.9, recoilVerticalScale: 1.08, moveSpeedScale: 1.06),
         AttachmentData(id: "stk_heavy", name: "Heavy Stock", slot: .stock, rarity: .rare,
                        unlockKills: 85, storeCostCoins: 8000,
                        description: "Rock steady, but you are slower.",
@@ -154,7 +154,7 @@ public enum AttachmentDatabase {
         AttachmentData(id: "las_ir", name: "IR Illuminator", slot: .laser, rarity: .epic,
                        unlockKills: 130, storeCostCoins: 14000,
                        description: "Invisible beam: hip fire accuracy with no tell.",
-                       hipSpreadScale: 0.78, adsTimeScale: 0.96)
+                       adsTimeScale: 0.96, hipSpreadScale: 0.78)
     ]
 
     private static let index: [AttachmentID: AttachmentData] = {

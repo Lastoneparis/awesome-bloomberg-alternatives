@@ -8,6 +8,7 @@ import CriticalStrikeCore
 /// the game never depends on a particular mediation vendor, and the simulator/unit-test
 /// builds use `NoAdsAdapter`, which reports every ad as completed without showing one.
 /// Rewarded ads are always optional and never gate progression — only bonuses.
+@MainActor
 protocol AdNetworkAdapter: AnyObject {
     var isRewardedReady: Bool { get }
     var isInterstitialReady: Bool { get }
@@ -17,6 +18,7 @@ protocol AdNetworkAdapter: AnyObject {
 }
 
 /// Used in debug builds, the simulator, and whenever the player has removed ads.
+@MainActor
 final class NoAdsAdapter: AdNetworkAdapter {
     var isRewardedReady: Bool { true }
     var isInterstitialReady: Bool { true }
@@ -29,6 +31,7 @@ final class NoAdsAdapter: AdNetworkAdapter {
     }
 }
 
+@MainActor
 final class AdService {
     /// Placements, so analytics can tell which ones actually earn.
     enum Placement: String {
@@ -82,7 +85,6 @@ final class AdService {
         }
     }
 
-    @MainActor
     static func topViewController() -> UIViewController? {
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })

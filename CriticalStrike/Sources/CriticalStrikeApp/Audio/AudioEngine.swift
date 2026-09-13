@@ -48,7 +48,6 @@ final class AudioEngine {
         environment.distanceAttenuationParameters.rolloffFactor = 1.4
         environment.reverbParameters.enable = true
         environment.reverbParameters.loadFactoryReverbPreset(.mediumRoom)
-        environment.renderingAlgorithm = .HRTFHQ
 
         for _ in 0..<spatialVoiceCount {
             let node = AVAudioPlayerNode()
@@ -101,7 +100,10 @@ final class AudioEngine {
         spatialEnabled = settings.spatialAudioEnabled
         engine.mainMixerNode.outputVolume = masterVolume
         musicPlayer.volume = musicVolume
-        environment.renderingAlgorithm = spatialEnabled ? .HRTFHQ : .equalPowerPanning
+        // The rendering algorithm is a property of each 3D input, not of the environment.
+        for node in spatialPool {
+            node.renderingAlgorithm = spatialEnabled ? .HRTFHQ : .equalPowerPanning
+        }
     }
 
     // MARK: - Listener
@@ -117,14 +119,13 @@ final class AudioEngine {
 
     // MARK: - Playback
 
-    func playSpatial(_ name: String, at position: Vec3, volume: Float = 1, pitch: Float = 0) {
+    func playSpatial(_ name: String, at position: Vec3, volume: Float = 1) {
         guard isRunning, let buffer = buffer(named: name) else { return }
         let node = spatialPool[nextSpatial % spatialPool.count]
         nextSpatial += 1
         node.stop()
         node.position = AVAudio3DPoint(x: position.x, y: position.y, z: position.z)
         node.volume = volume * sfxVolume
-        node.rate = pitch == 0 ? 1 : pow(2, pitch / 12)
         node.scheduleBuffer(buffer, at: nil, options: .interrupts)
         node.play()
     }

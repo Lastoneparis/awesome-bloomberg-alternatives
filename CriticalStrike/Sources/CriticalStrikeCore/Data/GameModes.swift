@@ -168,7 +168,7 @@ public enum GameModeDatabase {
         GameModeData(id: "mode_oitc", kind: .oneInTheChamber,
                      summary: "One bullet, one life. Every kill reloads you.",
                      teamSize: 1, maxPlayers: 6, scoreLimit: 15, timeLimitSeconds: 420,
-                     respawnDelay: 3, startingHealth: 1, healthRegen: false,
+                     respawnDelay: 3, healthRegen: false, startingHealth: 1,
                      xpMultiplier: 1.3, unlockLevel: 15),
 
         GameModeData(id: "mode_zombies", kind: .zombies,

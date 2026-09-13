@@ -30,7 +30,7 @@ final class GameSession: NSObject, ObservableObject {
     private(set) var localPlayerID: PlayerID = .none
 
     // MARK: Systems
-    private(set) var renderer: GameRenderer
+    private(set) var gameRenderer: GameRenderer
     let controls = TouchControls()
     private let audio: AudioEngine
     private let haptics: HapticsService
@@ -76,7 +76,7 @@ final class GameSession: NSObject, ObservableObject {
         self.server = server
         self.sim = server.sim
         self.botDirector = server.botDirector
-        self.renderer = GameRenderer(map: map, settings: profile.settings)
+        self.gameRenderer = GameRenderer(map: map, settings: profile.settings)
         super.init()
 
         controls.settings = profile.settings
@@ -108,14 +108,9 @@ final class GameSession: NSObject, ObservableObject {
         audio.preload(for: map, loadout: sim.player(localPlayerID)?.loadout ?? Loadout.starter())
         onProgress?(0.7)
 
-        renderer.setLocalPlayer(localPlayerID, team: sim.player(localPlayerID)?.team ?? .none)
-        renderer.showSpawnMarkers(true)
+        gameRenderer.setLocalPlayer(localPlayerID, team: sim.player(localPlayerID)?.team ?? .none)
+        gameRenderer.showSpawnMarkers(true)
         onProgress?(0.9)
-
-        // Subscribe to simulation events.
-        sim.events.subscribe { [weak self] event in
-            Task { @MainActor in self?.handle(event) }
-        }
         onProgress?(1.0)
     }
 
@@ -133,7 +128,7 @@ final class GameSession: NSObject, ObservableObject {
 
     func end() {
         isPaused = true
-        renderer.reset()
+        gameRenderer.reset()
         client?.disconnect()
         server = nil
         client = nil
@@ -142,13 +137,13 @@ final class GameSession: NSObject, ObservableObject {
     func applySettings(_ settings: GameSettings) {
         self.settings = settings
         controls.settings = settings
-        renderer.applySettings(settings)
+        gameRenderer.applySettings(settings)
     }
 
     func setScreenSize(_ size: CGSize) { screenSize = size }
 
     func attach(to view: SCNView) {
-        renderer.attach(to: view)
+        gameRenderer.attach(to: view)
         view.delegate = self
     }
 
@@ -163,7 +158,7 @@ final class GameSession: NSObject, ObservableObject {
         let target = aimAssist.findTarget(from: player, candidates: candidates, world: sim.world,
                                           level: settings.aimAssist,
                                           screenHeightPoints: Float(screenSize.height),
-                                          verticalFOV: Float(renderer.cameraNode.camera?.fieldOfView ?? 78)
+                                          verticalFOV: Float(gameRenderer.cameraNode.camera?.fieldOfView ?? 78)
                                               * MathUtil.deg2rad)
 
         // 2. Build and submit the local command.
@@ -177,30 +172,35 @@ final class GameSession: NSObject, ObservableObject {
             botDirector.step(sim: sim, dt: GameClock.tickInterval)
             sim.step(deltaTime: GameClock.tickInterval)
         }
+        // 4. Drain the simulation's events into audio, haptics, effects and the HUD.
+        //    Done synchronously on the main actor: the presentation layer is the only
+        //    consumer, and a Task per event would cost more than the work itself.
+        for event in sim.events.drain() { handle(event) }
+
         if steps == 0 { return }
 
-        // 4. Render.
+        // 5. Render.
         player = sim.player(localPlayerID) ?? player
         if player.isAlive {
-            renderer.updateCamera(player: player, renderPosition: player.position, deltaTime: deltaTime)
+            gameRenderer.updateCamera(player: player, renderPosition: player.position, deltaTime: deltaTime)
         } else {
             let killer = player.lastAttacker.isValid ? sim.player(player.lastAttacker)?.position : nil
-            renderer.updateDeathCamera(victimPosition: player.position, killerPosition: killer,
+            gameRenderer.updateDeathCamera(victimPosition: player.position, killerPosition: killer,
                                        deltaTime: deltaTime)
         }
 
         let snapshot = WorldSnapshot(from: sim)
-        renderer.syncPlayers(snapshot: snapshot, names: playerNames, deltaTime: deltaTime,
+        gameRenderer.syncPlayers(snapshot: snapshot, names: playerNames, deltaTime: deltaTime,
                              weaponBuilds: weaponBuilds)
-        renderer.syncPickups(sim.pickups)
-        renderer.syncProjectiles(snapshot.projectiles)
-        renderer.showSpawnMarkers(sim.state.phase == .warmup || sim.state.phase == .freezeTime)
+        gameRenderer.syncPickups(sim.pickups)
+        gameRenderer.syncProjectiles(snapshot.projectiles)
+        gameRenderer.showSpawnMarkers(sim.state.phase == .warmup || sim.state.phase == .freezeTime)
 
-        // 5. Listener for spatial audio.
+        // 6. Listener for spatial audio.
         let eye = player.eyePosition
         audio.updateListener(position: eye, forward: player.angles.forward, up: Vec3.up)
 
-        // 6. Throttled HUD publish (20Hz is plenty for numbers that change this slowly).
+        // 7. Throttled HUD publish (20Hz is plenty for numbers that change this slowly).
         hudUpdateAccumulator += deltaTime
         if hudUpdateAccumulator > 0.05 {
             hudUpdateAccumulator = 0
@@ -216,7 +216,7 @@ final class GameSession: NSObject, ObservableObject {
         let weapon = player.activeWeapon
         let objective = sim.currentRules.objectiveSummary(sim: sim)
 
-        hud = HUDState(
+        var next = HUDState(
             health: player.health,
             maxHealth: player.maxHealth,
             armor: player.armor,
@@ -271,6 +271,15 @@ final class GameSession: NSObject, ObservableObject {
             teammates: teammateMarkers(for: player),
             minimapEnemies: minimapEnemies(for: player)
         )
+        // Transient feedback is driven by events, not by this snapshot, so carry it over.
+        next.hitMarkerTimestamp = hud.hitMarkerTimestamp
+        next.lastHitWasHeadshot = hud.lastHitWasHeadshot
+        next.killConfirmTimestamp = hud.killConfirmTimestamp
+        next.announcement = hud.announcement
+        next.announcementTimestamp = hud.announcementTimestamp
+        next.streakBanner = hud.streakBanner
+        next.streakBannerTimestamp = hud.streakBannerTimestamp
+        hud = next
         killFeed = sim.killFeed
         if showScoreboard {
             scoreboard = sim.buildResult(winner: .none).scoreboard
@@ -333,11 +342,11 @@ final class GameSession: NSObject, ObservableObject {
             let weapon = WeaponDatabase.weaponOrDefault(weaponID)
             if player == localPlayerID {
                 shotsFired += 1
-                renderer.effects.muzzleFlash(at: renderer.viewModel.muzzleNode, weapon: weapon)
-                renderer.effects.ejectShell(from: renderer.viewModel.ejectNode, weapon: weapon)
-                renderer.viewModel.applyRecoilKick(weapon: weapon,
+                gameRenderer.effects.muzzleFlash(at: gameRenderer.viewModel.muzzleNode, weapon: weapon)
+                gameRenderer.effects.ejectShell(from: gameRenderer.viewModel.ejectNode, weapon: weapon)
+                gameRenderer.viewModel.applyRecoilKick(weapon: weapon,
                                                    aiming: sim.player(localPlayerID)?.isAiming ?? false)
-                renderer.addCameraShake(intensity: weapon.recoilVertical * 1.4)
+                gameRenderer.addCameraShake(intensity: weapon.recoilVertical * 1.4)
                 haptics.weaponFire(recoil: weapon.recoilVertical)
                 audio.playUI(weapon.fireSound, volume: 0.9)
             } else {
@@ -345,19 +354,19 @@ final class GameSession: NSObject, ObservableObject {
             }
 
         case let .bulletTracer(from, to, weaponID):
-            renderer.effects.tracer(from: from, to: to,
+            gameRenderer.effects.tracer(from: from, to: to,
                                     weapon: WeaponDatabase.weaponOrDefault(weaponID),
                                     isLocalPlayer: false)
 
         case let .bulletImpact(position, normal, surface, penetrated):
-            renderer.effects.bulletImpact(position: position, normal: normal,
+            gameRenderer.effects.bulletImpact(position: position, normal: normal,
                                           surface: surface, penetrated: penetrated)
             audio.playSpatial(surface.impactEffect, at: position, volume: 0.55)
 
         case let .playerDamaged(victim, attacker, amount, hitbox, position):
             if victim == localPlayerID {
                 haptics.tookDamage(amount: amount)
-                renderer.addCameraShake(intensity: min(0.35, amount * 0.004))
+                gameRenderer.addCameraShake(intensity: min(0.35, amount * 0.004))
                 if let attackerState = sim.player(attacker) {
                     damageIndicators.append(DamageIndicator(
                         direction: directionAngle(from: sim.player(localPlayerID)?.position ?? .zero,
@@ -376,14 +385,14 @@ final class GameSession: NSObject, ObservableObject {
                     floatingDamage.append(FloatingDamage(amount: amount, headshot: hitbox.isHead,
                                                          worldPosition: position, timestamp: sim.time))
                 }
-                renderer.effects.bloodSpray(position: position,
+                gameRenderer.effects.bloodSpray(position: position,
                                             direction: (position - (sim.player(localPlayerID)?.eyePosition ?? .zero)).normalized,
                                             amount: amount, showBlood: settings.showBlood)
             }
 
         case let .playerDied(victim, killer, weaponID, headshot, _):
             let impulse = (sim.player(victim)?.velocity ?? .zero) * 30 + Vec3(0, 60, 0)
-            renderer.playerDied(victim, impulse: impulse)
+            gameRenderer.playerDied(victim, impulse: impulse)
             missionTracker.handle(event, localPlayer: localPlayerID)
             if killer == localPlayerID {
                 killsByWeapon[weaponID, default: 0] += 1
@@ -397,7 +406,7 @@ final class GameSession: NSObject, ObservableObject {
             }
 
         case let .grenadeThrown(_, kind, entity, origin, _):
-            renderer.effects.spawnGrenade(entity: entity, kind: kind, position: origin)
+            gameRenderer.effects.spawnGrenade(entity: entity, kind: kind, position: origin)
             audio.playSpatial("sfx_grenade_throw", at: origin, volume: 0.7)
 
         case let .grenadeBounced(_, position, surface):
@@ -405,27 +414,27 @@ final class GameSession: NSObject, ObservableObject {
                               volume: 0.5 * surface.footstepVolume)
 
         case let .grenadeDetonated(entity, kind, position):
-            renderer.effects.removeGrenade(entity: entity)
+            gameRenderer.effects.removeGrenade(entity: entity)
             if kind != .smoke && kind != .decoy {
-                renderer.effects.explosion(position: position,
+                gameRenderer.effects.explosion(position: position,
                                            radius: GrenadeDatabase.grenade(kind: kind).outerRadius,
                                            kind: kind)
                 audio.playSpatial(kind == .flash ? "sfx_flash" : "sfx_explosion", at: position)
                 if let player = sim.player(localPlayerID) {
                     let distance = player.position.distance(to: position)
                     let intensity = MathUtil.clamp(1 - distance / 18, 0, 1)
-                    renderer.addCameraShake(intensity: intensity * 1.4)
+                    gameRenderer.addCameraShake(intensity: intensity * 1.4)
                     haptics.explosion(distanceScale: intensity)
                 }
             }
 
         case let .smokeStarted(entity, position, radius, duration):
-            renderer.effects.startSmoke(entity: entity, position: position,
+            gameRenderer.effects.startSmoke(entity: entity, position: position,
                                         radius: radius, duration: duration)
             audio.playSpatial("sfx_smoke", at: position)
 
         case let .fireStarted(entity, position, radius, duration):
-            renderer.effects.startFire(entity: entity, position: position,
+            gameRenderer.effects.startFire(entity: entity, position: position,
                                        radius: radius, duration: duration)
             audio.playSpatial("sfx_fire_loop", at: position)
 
@@ -445,11 +454,11 @@ final class GameSession: NSObject, ObservableObject {
 
         case let .playerSpawned(player, _, team):
             if player == localPlayerID {
-                renderer.setLocalPlayer(localPlayerID, team: team)
+                gameRenderer.setLocalPlayer(localPlayerID, team: team)
                 if let state = sim.player(localPlayerID) {
                     controls.setAngles(yaw: state.angles.yaw, pitch: state.angles.pitch)
                     if let build = weaponBuilds[localPlayerID] {
-                        renderer.viewModel.equip(build: build,
+                        gameRenderer.viewModel.equip(build: build,
                                                  skin: build.skin.flatMap(CosmeticDatabase.cosmetic))
                     }
                 }
@@ -460,7 +469,7 @@ final class GameSession: NSObject, ObservableObject {
             var build = weaponBuilds[player] ?? WeaponBuild(weapon: weaponID)
             if build.weapon != weaponID { build = WeaponBuild(weapon: weaponID) }
             weaponBuilds[player] = build
-            renderer.viewModel.equip(build: build,
+            gameRenderer.viewModel.equip(build: build,
                                      skin: build.skin.flatMap(CosmeticDatabase.cosmetic))
             audio.playUI("sfx_weapon_swap", volume: 0.7)
 
@@ -485,8 +494,8 @@ final class GameSession: NSObject, ObservableObject {
             missionTracker.handle(event, localPlayer: localPlayerID)
 
         case let .bombExploded(position):
-            renderer.effects.explosion(position: position, radius: 30, kind: .frag)
-            renderer.addCameraShake(intensity: 3)
+            gameRenderer.effects.explosion(position: position, radius: 30, kind: .frag)
+            gameRenderer.addCameraShake(intensity: 3)
             audio.playSpatial("sfx_bomb_explode", at: position)
 
         case let .killStreak(player, count):
@@ -522,7 +531,7 @@ final class GameSession: NSObject, ObservableObject {
 
         case let .pickupCollected(player, entity, kind):
             guard player == localPlayerID else { return }
-            renderer.effects.removeVolume(entity: entity)
+            gameRenderer.effects.removeVolume(entity: entity)
             audio.playUI("sfx_pickup")
             hud.announcement = kind.displayName.uppercased()
             hud.announcementTimestamp = sim.time
@@ -531,7 +540,7 @@ final class GameSession: NSObject, ObservableObject {
             playerNames[player] = name
 
         case let .playerLeft(player):
-            renderer.removePlayer(player)
+            gameRenderer.removePlayer(player)
             playerNames[player] = nil
 
         case let .matchEnded(result):
@@ -625,7 +634,7 @@ extension GameSession: SCNSceneRendererDelegate {
                 delta = Float(min(time - lastFrameTime, 0.1))
             }
             lastFrameTime = time
-            self.renderer.updateDynamicResolution(frameTime: Double(delta))
+            self.gameRenderer.updateDynamicResolution(frameTime: Double(delta))
             step(deltaTime: delta)
         }
     }

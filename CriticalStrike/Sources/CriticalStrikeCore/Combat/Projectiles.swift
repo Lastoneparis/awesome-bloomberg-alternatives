@@ -85,7 +85,8 @@ public final class ProjectileSystem {
         var survivors: [Projectile] = []
         survivors.reserveCapacity(projectiles.count)
 
-        for var p in projectiles {
+        for stored in projectiles {
+            var p = stored
             let data = p.data
             var detonate = false
 
@@ -165,7 +166,8 @@ public final class ProjectileSystem {
     private func stepAreaEffects(dt: Float) {
         var survivors: [AreaEffect] = []
         survivors.reserveCapacity(areaEffects.count)
-        for var e in areaEffects {
+        for stored in areaEffects {
+            var e = stored
             e.lastTickDamage = max(0, e.lastTickDamage - dt)
             if !e.timer.tick(dt) { survivors.append(e) }
         }

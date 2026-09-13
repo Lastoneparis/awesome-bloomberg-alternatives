@@ -18,7 +18,7 @@ public enum LogLevel: Int, Comparable, Sendable {
 /// Deliberately tiny: a shipping mobile game should not pay for string formatting
 /// it will never print, so every call site goes through an autoclosure.
 public enum Log {
-    nonisolated(unsafe) public static var minimumLevel: LogLevel = {
+    public static var minimumLevel: LogLevel = {
         #if DEBUG
         return .debug
         #else
@@ -26,7 +26,7 @@ public enum Log {
         #endif
     }()
 
-    nonisolated(unsafe) public static var sink: ((LogLevel, String) -> Void)?
+    public static var sink: ((LogLevel, String) -> Void)?
 
     public static func log(_ level: LogLevel, _ message: @autoclosure () -> String, category: String = "game") {
         guard level >= minimumLevel else { return }

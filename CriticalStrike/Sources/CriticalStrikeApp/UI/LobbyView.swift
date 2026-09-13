@@ -4,7 +4,7 @@ import CriticalStrikeCore
 struct MatchmakingView: View {
     @EnvironmentObject private var app: AppState
     @State private var elapsed: Float = 0
-    @State private var timer: Timer?
+    @State private var timer: Foundation.Timer?
 
     var body: some View {
         ZStack {
@@ -64,7 +64,7 @@ struct MatchmakingView: View {
     private func startTimer() {
         elapsed = 0
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+        timer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
             Task { @MainActor in
                 elapsed += 0.2
                 app.tickMatchmaking(dt: 0.2)

@@ -65,7 +65,7 @@ struct SettingsView: View {
             }
 
             settingGroup("Firing") {
-                picker("Fire mode", selection: binding(\.fireMode), options: FireMode2.allCases) {
+                picker("Fire mode", selection: binding(\.triggerMode), options: TriggerMode.allCases) {
                     $0.displayName
                 }
                 toggle("Auto sprint", binding(\.autoSprint))

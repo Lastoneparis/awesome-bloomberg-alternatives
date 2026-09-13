@@ -85,7 +85,7 @@ public enum WeaponSystem {
 
         // Fire.
         let wantsFire = input.buttons.contains(.fire)
-        if player.slots[player.activeSlot]?.burstRemaining ?? 0 > 0 {
+        if (player.slots[player.activeSlot]?.burstRemaining ?? 0) > 0 {
             outcomes.append(contentsOf: tryFire(&player, ctx: ctx, rng: &rng, forced: true))
         } else if wantsFire {
             outcomes.append(contentsOf: tryFire(&player, ctx: ctx, rng: &rng, forced: false))

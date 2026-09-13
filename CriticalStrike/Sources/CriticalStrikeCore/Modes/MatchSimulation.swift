@@ -55,7 +55,7 @@ public final class MatchSimulation {
         self.rules = GameModeRulesFactory.rules(for: mode.kind)
         setupPickups()
         state.captures = map.capturePoints.map { CaptureState(index: $0.index) }
-        state.phaseTimer.start(mode.warmupSeconds)
+        state.phaseTimer.start(max(0.5, mode.warmupSeconds))
         if mode.timeLimitSeconds > 0 { state.matchTimer.start(mode.timeLimitSeconds) }
     }
 
@@ -509,7 +509,7 @@ public final class MatchSimulation {
             player.hasHelmet = true
         case .ammo:
             var topped = false
-            for slot in player.slots.keys {
+            for slot in Array(player.slots.keys) {
                 guard var s = player.slots[slot] else { continue }
                 let w = s.resolvedWeapon
                 if s.reserveAmmo < w.reserveAmmo {

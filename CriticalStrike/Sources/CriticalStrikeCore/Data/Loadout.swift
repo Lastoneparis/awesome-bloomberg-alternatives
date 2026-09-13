@@ -129,7 +129,7 @@ public struct Loadout: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-public struct PerkEffects: Sendable {
+public struct PerkEffects: Codable, Equatable, Sendable {
     public var moveSpeedScale: Float = 1
     public var healthBonus: Float = 0
     public var armorBonus: Float = 0
