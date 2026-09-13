@@ -154,6 +154,139 @@ measurably less accurate, with no code aware of which era it is running.
 
 ---
 
+## Progression  *(simulation side complete)*
+
+- [x] `XpCurve` — integer arithmetic, quadratic, capped at level 100
+- [x] `PlayerProgress` — career stats, per-weapon stats, unlocks
+- [x] `RewardRules` — experience from a finished match, computed server-side only
+- [x] `UnlockTable` — what each level grants, validated against the catalogue
+- [x] 20 tests
+
+### The rule this phase is built around
+
+**No weapon is ever locked behind a level, and `UnlockTable.Validate` rejects one that is.**
+
+Gating weapons by level is the genre default and it is a fairness problem wearing a
+progression costume: a new player meets a veteran carrying something they cannot yet hold, and
+the difference is time served rather than skill. The brief forbids *selling* a competitive
+advantage; granting one for grinding is the same advantage at a slower price, and worse in one
+respect — invisible to anyone auditing the store. Progression grants cosmetics, titles and
+attachments, and attachments must already have a downside.
+
+### The reward curve
+
+Participation is the largest component for any ordinary match, on purpose. A kill-weighted
+curve rewards whoever was already winning and quietly teaches a team that playing the
+objective costs them something. Measured over a 13-round objective match, the top scorer
+earned 3026 and the bottom 1116 — a 2.7:1 spread from a 15:1 spread in kills. There is no loss
+penalty: losing already costs the win bonus, and taking experience away rewards quitting a
+losing game early.
+
+### Known gaps
+- [ ] Nothing is persisted. `PlayerProgress` lives in memory; there is no account store.
+- [ ] No challenges, dailies, or seasons.
+- [ ] No cosmetic content exists yet — the unlock table grants ids nothing renders.
+- [ ] Career stats are not surfaced to a client; the snapshot carries none of them.
+
+---
+
+## Live content  *(the correctness half)*
+
+- [x] `ContentManifest` — a fingerprint of a content set, split in two
+- [x] `ContentCompatibility` — the gate a client passes before it may join
+- [x] `ContentPatch` — content added or rebalanced over a base catalogue, without mutating it
+- [x] Manifest exchanged in the `NetServer` handshake
+- [x] 23 tests
+
+### Why two hashes
+
+A **simulation** hash covers everything the authoritative simulation reads: damage, spread,
+timings, map geometry, mode rules. A mismatch refuses the connection, because two machines
+running different weapon statistics produce a match where prediction never settles and damage
+numbers disagree — and every symptom of that points at the netcode. Nothing errors. It is the
+nastiest bug class this project can have.
+
+A **presentation** hash covers display, model and sound keys. A mismatch is logged and
+allowed, because blocking would mean a translation fix could not ship without forcing the
+whole fleet to update at the same moment.
+
+The split is tested from both sides: changing `BaseDamage` must move the simulation hash;
+changing `DisplayNameKey` must not.
+
+### What a patch may and may not do
+
+A patch **adds** and **replaces**; it cannot remove. Removing a weapon mid-season breaks every
+saved loadout referencing it, every replay and every statistics page, and does so server-side
+where the player cannot see why. Retiring content means leaving the definition and taking it
+out of the pools, which a replace does.
+
+A patch ships **data, not code**. A new weapon, map, attachment or balance number needs no
+client update; a new mode's *rules* are an `IGameMode` implementation and do.
+`ContentPatch.ValidateAgainst` rejects a patch adding a mode kind nothing in the build
+implements, rather than letting it appear in a menu and throw when chosen.
+
+### Not anti-cheat
+
+A modified client can report whatever hash it likes. That is fine and not what this is for:
+the server already refuses to take a client's word for damage, health, position or hits, so
+altered client content changes what that client *draws* and nothing about what happens. This
+catches the honest case — a partial download, a stale build, a patch that reached half the
+fleet.
+
+### Known gaps
+- [ ] Nothing is downloaded. There is no CDN, no Addressables wiring, no patch transport.
+- [ ] No staged rollout, feature flags, or per-region content.
+- [ ] The manifest is exchanged but not signed, so it is a correctness check only.
+- [ ] No content authoring pipeline: a patch is constructed in code, not loaded from JSON.
+
+---
+
+## Friends and parties  *(data model and rules)*
+
+- [x] `SocialGraph` — friends, pending requests, blocks, account deletion
+- [x] `Party` — invitations, leadership migration, ready state, mode-aware size cap
+- [x] 25 tests
+
+### Blocking is the load-bearing feature, not friending
+
+Friend lists fail harmlessly. Block lists fail by exposing someone to a person they have
+deliberately shut out, so blocking is enforced at the graph level and is stronger than every
+other relationship:
+
+- it severs an existing friendship, because a block that leaves one in place does nothing the
+  moment any code path consults the friend list instead of the block list — and there will
+  always be such a path;
+- it cancels pending requests in both directions;
+- it is **one-sided in intent, mutual in effect**. A block that only stops the blocked party
+  lets the blocker keep sending invitations to someone with no way to refuse them;
+- it applies to party invitations, checked against *every* member rather than the leader, and
+  re-checked on acceptance so an invitation is not a licence that outlives the block;
+- `Party.EnforceBlocks` ejects immediately, so blocking someone you are currently partied with
+  works now rather than whenever the party happens to disband.
+
+Each of those was verified by breaking it: making blocks one-directional fails four tests,
+and removing the check from party invitations fails two.
+
+### Privacy
+
+The graph stores account ids and nothing else — no names, no history, no timestamps, no
+"people you may know". §33 forbids invasive practices and the cheapest way to honour that is
+to have nowhere to put the data.
+
+`ForgetAccount` erases in every direction **including other people's block lists**. Keeping
+those is the tempting choice, and it is wrong: a deleted id is never reissued, so a retained
+entry protects nobody and can only serve as a record of who someone once blocked.
+
+### Known gaps
+- [ ] Nothing is persisted or networked. No Unity Lobby, no platform friends, no presence.
+- [ ] Reporting is not built. Blocking is personal; reporting goes to moderation and needs a
+      service, a queue and a policy — none of which exist.
+- [ ] No voice, no text chat, so none of the moderation those need.
+- [ ] Party membership does not yet reach matchmaking; `CanQueueFor` answers the question but
+      nothing asks it.
+
+---
+
 ## Known issues / decisions deferred
 
 - [ ] **Trademark search for "SALVO"** before any public use. Codename only.

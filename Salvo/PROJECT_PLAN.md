@@ -31,7 +31,7 @@ ranked ladders, a store. The architecture leaves room for each; none is implemen
 | 5 | Bots | 4 difficulties, navigation, cover, objectives | partly — 4 difficulties done and measured; navigation is steering, not pathfinding |
 | 6 | Networking | Server-authoritative, prediction, reconciliation, lag comp | **simulation side done** — measured over a lossy link; no real transport yet |
 | 7 | Lobby / matchmaking / private match | Create, invite, join, ready, start | not started |
-| 8 | Friends / parties | Add, accept, invite, block, report | not started |
+| 8 | Friends / parties | Add, accept, invite, block, report | **rules done** — graph and party enforced and tested; no service, no reporting |
 | 9 | Mobile controls | Customisable HUD, haptics, safe areas | not started |
 | 10 | Mac controls | KBM, remapping, sensitivity, FOV, windowed/fullscreen | not started |
 | 11 | UI | Menus, loadout, scoreboard, results | not started |
@@ -39,8 +39,8 @@ ranked ladders, a store. The architecture leaves room for each; none is implemen
 | 13 | Performance | Quality tiers, device detection, thermal handling | not started |
 | 14 | Second world (WWII) | Proves the world system with zero engine changes | **done in simulation** — the era's diff touched only Content/ |
 | 15 | More maps and weapons | Content velocity test | partly — 10 weapons, 2 maps, 2 eras |
-| 16 | Progression | XP, levels, stats, challenges | not started |
-| 17 | Cosmetics | Data-driven, no gameplay effect | not started |
+| 16 | Progression | XP, levels, stats, challenges | **simulation side done** — no persistence, no challenges |
+| 17 | Cosmetics | Data-driven, no gameplay effect | structure done — UnlockTable rejects anything that touches gameplay; no content yet |
 | 18 | Ranked | Dedicated servers, input-based pools | not started |
 | 19 | Store submission | Privacy, account deletion, ratings, metadata | not started |
 

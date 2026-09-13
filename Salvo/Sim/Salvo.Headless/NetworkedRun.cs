@@ -45,7 +45,8 @@ namespace Salvo.Headless
             IGameMode mode = GameModes.Create(modeDefinition);
 
             var match = new MatchSimulation(content, map, mode, options.Seed);
-            var server = new NetServer(match);
+            ContentManifest manifest = ContentManifest.Build(content, "headless");
+            var server = new NetServer(match, manifest);
             BotDifficultyDefinition difficulty = content.BotDifficulties.Get(options.Difficulty);
 
             int count = Math.Min(options.BotCount, modeDefinition.MaxPlayers);
@@ -68,7 +69,13 @@ namespace Salvo.Headless
                 SimulatedLink up = MakeLink(options.NetworkProfile, options.Seed + (uint)i * 31u);
                 SimulatedLink down = MakeLink(options.NetworkProfile, options.Seed + (uint)i * 71u);
                 links.Add((up, down));
-                server.AddClient(player.Id, toClient: down, fromClient: up);
+                ContentCheck admitted = server.AddClient(player.Id, toClient: down,
+                                                         fromClient: up, clientManifest: manifest);
+                if (!admitted.CanPlay)
+                {
+                    Console.Error.WriteLine($"client {i} refused: {admitted.ReasonKey}");
+                    return 2;
+                }
 
                 harnesses.Add(new ClientHarness
                 {
@@ -90,6 +97,7 @@ namespace Salvo.Headless
             }
 
             Console.WriteLine($"Salvo networked — {modeDefinition.Id} on {map.Id}");
+            Console.WriteLine($"  {manifest}");
             Console.WriteLine($"  {count} clients, {options.NetworkProfile} link, "
                               + $"seed {options.Seed}, {FixedClock.TicksPerSecond} Hz sim / "
                               + $"{NetServer.SnapshotHz} Hz snapshots");

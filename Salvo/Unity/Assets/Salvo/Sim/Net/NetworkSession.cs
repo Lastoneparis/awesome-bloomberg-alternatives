@@ -84,14 +84,50 @@ namespace Salvo.Sim
         public int BytesSent { get; private set; }
         public int SnapshotsSent { get; private set; }
 
-        public NetServer(MatchSimulation match) { _match = match; }
+        /// <summary>
+        /// The content this server is running. Every client is checked against it before being
+        /// allowed in.
+        /// </summary>
+        public ContentManifest Manifest { get; }
 
-        public void AddClient(PlayerId player, SimulatedLink toClient, SimulatedLink fromClient)
+        /// <summary>Clients refused because their content did not match.</summary>
+        public int RejectedClients { get; private set; }
+
+        public NetServer(MatchSimulation match, ContentManifest manifest = null)
         {
+            _match = match;
+            Manifest = manifest ?? ContentManifest.Build(match.Content);
+        }
+
+        /// <summary>
+        /// Admits a client, if its content agrees with the server's.
+        /// </summary>
+        /// <remarks>
+        /// The check happens here rather than after the first snapshot on purpose. A client
+        /// running different weapon statistics produces a match where prediction never settles
+        /// and damage numbers disagree, and every symptom of it points at the netcode. Refusing
+        /// at the door turns a week of confused debugging into one message.
+        ///
+        /// <para>A null <paramref name="clientManifest"/> means the client did not present one,
+        /// which is refused rather than assumed fine — an old build that does not know to send a
+        /// manifest is exactly the kind of client this is for.</para>
+        /// </remarks>
+        public ContentCheck AddClient(PlayerId player, SimulatedLink toClient,
+                                      SimulatedLink fromClient,
+                                      ContentManifest clientManifest = null)
+        {
+            ContentCheck check = ContentCompatibility.Check(Manifest, clientManifest ?? Manifest);
+            if (!check.CanPlay)
+            {
+                RejectedClients++;
+                return check;
+            }
+
             _clients[player.Raw] = new ClientLink
             {
                 Player = player, ToClient = toClient, FromClient = fromClient,
             };
+            return check;
         }
 
         /// <summary>Advances the server by one tick: read input, simulate, maybe send snapshots.</summary>

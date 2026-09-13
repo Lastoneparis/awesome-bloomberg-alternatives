@@ -69,6 +69,20 @@ namespace Salvo.Headless
             var stats = new RunStatistics(options.MaxSeconds);
             stats.Observe(match, options.Verbose);
 
+            // Career progress for every player, folded in as the match runs. Exercised here
+            // rather than only in tests so a regression in reward accounting shows up in a run.
+            var progress = new Dictionary<int, PlayerProgress>();
+            UnlockTable unlocks = StarterContent.BuildUnlocks();
+            List<string> unlockProblems = unlocks.Validate(content);
+            if (unlockProblems.Count > 0)
+            {
+                foreach (string problem in unlockProblems)
+                    Console.Error.WriteLine($"unlocks: {problem}");
+                return 2;
+            }
+            foreach (PlayerRuntime player in match.Players)
+                progress[player.Id.Raw] = new PlayerProgress { AccountId = player.Name };
+
             Console.WriteLine($"Salvo headless — {modeDefinition.Id} on {map.Id}");
             Console.WriteLine($"  seed {options.Seed}, {match.Players.Count} bots, "
                               + $"{options.Difficulty}, tick rate {FixedClock.TicksPerSecond} Hz");
@@ -83,10 +97,13 @@ namespace Salvo.Headless
                 match.Step();
                 stats.Observe(match, options.Verbose);
                 stats.ObserveObjective(match);
+                foreach (PlayerRuntime player in match.Players)
+                    RewardRules.RecordEvents(progress[player.Id.Raw], player.Id, match.Events, content);
             }
             stopwatch.Stop();
 
             Report(match, stats, stopwatch.Elapsed, maxTicks);
+            ReportProgression(match, progress, unlocks);
             return stats.Verdict(match) ? 0 : 1;
         }
 
@@ -108,6 +125,38 @@ namespace Salvo.Headless
                 match.AddPlayer($"Bot{i:D2}", team, loadout, isBot: true,
                                 botDifficulty: options.Difficulty);
             }
+        }
+
+        /// <summary>
+        /// What each player earned, and what it unlocked.
+        /// </summary>
+        /// <remarks>
+        /// Printed because the shape of the reward curve is a design decision that is easy to
+        /// get wrong quietly. Seeing participation and objective experience next to kill
+        /// experience, match after match, is how anyone notices that the curve has drifted back
+        /// towards rewarding whoever was already winning.
+        /// </remarks>
+        private static void ReportProgression(MatchSimulation match,
+                                              Dictionary<int, PlayerProgress> progress,
+                                              UnlockTable unlocks)
+        {
+            Console.WriteLine("--- progression --------------------------------------------");
+            Console.WriteLine($"{"player",-10} {"kill",6} {"assist",7} {"objective",10} "
+                              + $"{"played",7} {"win",5} {"total",7} {"level",6} {"unlocked",9}");
+
+            foreach (PlayerRuntime player in match.Players)
+            {
+                MatchRewards rewards = RewardRules.Compute(match, player);
+                PlayerProgress career = progress[player.Id.Raw];
+                career.Apply(rewards);
+                int granted = career.GrantUnlocksFor(unlocks).Count;
+
+                Console.WriteLine($"{player.Name,-10} {rewards.KillXp,6} {rewards.AssistXp,7} "
+                                  + $"{rewards.ObjectiveXp,10} {rewards.ParticipationXp,7} "
+                                  + $"{rewards.WinBonusXp,5} {rewards.TotalXp,7} "
+                                  + $"{career.Level,6} {granted,9}");
+            }
+            Console.WriteLine();
         }
 
         private static void Report(MatchSimulation match, RunStatistics stats, TimeSpan elapsed,

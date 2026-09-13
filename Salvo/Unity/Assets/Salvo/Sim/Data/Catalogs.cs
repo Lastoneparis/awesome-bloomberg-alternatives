@@ -61,6 +61,17 @@ namespace Salvo.Sim
         /// hand is wrong sometimes, and a dangling id should be a startup error naming the
         /// field, not a null reference thirty seconds into a match.
         /// </remarks>
+        /// <summary>
+        /// Indirection so this file does not depend on the modes layer.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Salvo.Sim.GameModes"/> knows which kinds have implementations, and that is
+        /// a fact about rules rather than about content. Calling it through a local wrapper keeps
+        /// the dependency visible at one line rather than buried in a loop.
+        /// </remarks>
+        private static bool GameModes_IsImplemented(GameModeKind kind) =>
+            Salvo.Sim.GameModes.IsImplemented(kind);
+
         public List<string> Validate()
         {
             var problems = new List<string>();
@@ -96,9 +107,44 @@ namespace Salvo.Sim
                     problems.Add($"weapon {weapon.Id}: belongs to missing world '{weapon.WorldId}'");
 
             foreach (FactionDefinition faction in Factions.All)
+            {
+                if (!faction.WorldId.IsEmpty && !Worlds.Contains(faction.WorldId))
+                    problems.Add($"faction {faction.Id}: belongs to missing world '{faction.WorldId}'");
                 foreach (ContentId characterId in faction.Characters)
                     if (!Characters.Contains(characterId))
                         problems.Add($"faction {faction.Id}: references missing character '{characterId}'");
+                foreach (ContentId weaponId in faction.WeaponPool)
+                    if (!Weapons.Contains(weaponId))
+                        problems.Add($"faction {faction.Id}: weapon pool references missing weapon '{weaponId}'");
+            }
+
+            foreach (CharacterDefinition character in Characters.All)
+                if (!character.FactionId.IsEmpty && !Factions.Contains(character.FactionId))
+                    problems.Add($"character {character.Id}: belongs to missing faction '{character.FactionId}'");
+
+            // An attachment naming a weapon that does not exist is never compatible with
+            // anything, and nothing reports it: the compatibility check simply returns false and
+            // the attachment is silently unequippable. That is a content bug that survives every
+            // other check here, because the attachment itself is perfectly well formed.
+            foreach (AttachmentDefinition attachment in Attachments.All)
+            {
+                if (attachment.CompatibleWeapons == null) continue;
+                foreach (ContentId weaponId in attachment.CompatibleWeapons)
+                    if (!Weapons.Contains(weaponId))
+                        problems.Add($"attachment {attachment.Id}: is declared compatible with "
+                                     + $"missing weapon '{weaponId}', so it would never be equippable");
+            }
+
+            // A map that supports a mode kind nothing implements is a map that cannot be played
+            // in the rotation it advertises.
+            foreach (MapDefinition map in Maps.All)
+            {
+                if (map.SupportedModes == null) continue;
+                foreach (GameModeKind kind in map.SupportedModes)
+                    if (!GameModes_IsImplemented(kind))
+                        problems.Add($"map {map.Id}: advertises mode kind {kind}, which has no "
+                                     + "implementation in this build");
+            }
 
             return problems;
         }

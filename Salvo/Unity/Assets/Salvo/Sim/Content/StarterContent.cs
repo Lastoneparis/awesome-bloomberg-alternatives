@@ -110,6 +110,44 @@ namespace Salvo.Sim
             IEnumerable<MapDefinition> IWorldContent.Maps() { yield return BuildJunction(); }
         }
 
+        /// <summary>
+        /// What each level grants. Weapons are absent on purpose — see <see cref="UnlockTable"/>.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately thin, and it should stay thin until there is real cosmetic content to
+        /// hang on it. A long table of placeholder ids would validate cleanly and mean nothing;
+        /// the value here is the shape and the rule, not the quantity.
+        /// </remarks>
+        public static UnlockTable BuildUnlocks()
+        {
+            var table = new UnlockTable();
+
+            // Attachments are sidegrades — each already costs the player something, enforced by
+            // AttachmentDefinition.Validate — so gating them behind a level changes which
+            // trade-offs are available rather than how strong the player is.
+            table.Add(new UnlockEntry(3, Attachments.Compensator,
+                                      "attachment.compensator.name", UnlockKind.Attachment));
+            table.Add(new UnlockEntry(6, Attachments.ShortScope,
+                                      "attachment.short_scope.name", UnlockKind.Attachment));
+            table.Add(new UnlockEntry(10, Attachments.ExtendedMag,
+                                      "attachment.extended_mag.name", UnlockKind.Attachment));
+            table.Add(new UnlockEntry(14, WartimeWorld.Attachments.Bipod,
+                                      "attachment.bipod.name", UnlockKind.Attachment));
+            table.Add(new UnlockEntry(18, WartimeWorld.Attachments.ExtendedStick,
+                                      "attachment.extended_stick.name", UnlockKind.Attachment));
+
+            // Titles and cosmetics never reach the simulation at all.
+            table.Add(new UnlockEntry(2, "title.recruit", "title.recruit.name", UnlockKind.Title));
+            table.Add(new UnlockEntry(8, "title.operator", "title.operator.name", UnlockKind.Title));
+            table.Add(new UnlockEntry(20, "title.veteran", "title.veteran.name", UnlockKind.Title));
+            table.Add(new UnlockEntry(5, "cosmetic.weapon_tint_slate",
+                                      "cosmetic.weapon_tint_slate.name", UnlockKind.Cosmetic));
+            table.Add(new UnlockEntry(12, "cosmetic.weapon_tint_ember",
+                                      "cosmetic.weapon_tint_ember.name", UnlockKind.Cosmetic));
+
+            return table;
+        }
+
         /// <summary>Every era the game ships with. Adding one is adding a line here and a file.</summary>
         public static IEnumerable<IWorldContent> AllWorlds()
         {
