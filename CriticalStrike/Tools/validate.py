@@ -100,6 +100,16 @@ def main():
             lineno = code[:match.start()].count('\n') + 1
             errors.append(f"{rel}:{lineno}: key path into a tuple element is not valid Swift")
 
+        # The world material carries a world-space shader modifier, so anything that
+        # travels through the world — a view model welded to the camera, a thrown grenade,
+        # an ejected casing — must use partMaterial(for:) instead, or its tone shifts as
+        # it moves. Only level geometry may use material(for:).
+        if os.path.basename(rel) != 'MapBuilder.swift':
+            for match in re.finditer(r'\.material\(\s*for:', code):
+                lineno = code[:match.start()].count('\n') + 1
+                errors.append(f"{rel}:{lineno}: material(for:) outside MapBuilder carries "
+                              "world-space macro variation; use partMaterial(for:)")
+
         for lineno, line in enumerate(raw.split('\n'), 1):
             match = DECL_RE.match(line)
             if match and match.group(1) != 'extension':

@@ -88,8 +88,8 @@ final class EffectsSystem {
     func ejectShell(from node: SCNNode, weapon: WeaponData) {
         guard quality != .low, weapon.weaponClass != .melee else { return }
         let shell = SCNNode(geometry: SCNCylinder(radius: 0.005, height: 0.018))
-        shell.geometry?.firstMaterial = materials.material(
-            for: .metal, tintOverride: UIColor(hex: 0xC9A227))
+        shell.geometry?.firstMaterial = materials.partMaterial(
+            for: .metal, tint: UIColor(hex: 0xC9A227))
         shell.worldPosition = node.presentation.worldPosition
         shell.eulerAngles = SCNVector3(0, 0, Float.pi / 2)
         root.addChildNode(shell)
