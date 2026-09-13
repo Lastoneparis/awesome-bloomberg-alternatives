@@ -460,3 +460,76 @@ final class MatchFlowTests: XCTestCase {
         }
     }
 }
+
+/// Every shipped map, built for real.
+///
+/// The whole suite used to die on its first test with "Range requires lowerBound <=
+/// upperBound", because Vault has a descending staircase and `stairs()` put each step's
+/// base above its tread — an inverted AABB, which the collision grid walks as a range.
+/// Nothing exercised map construction directly, so the crash surfaced through whichever
+/// test happened to touch a map first.
+final class MapIntegrityTests: XCTestCase {
+
+    func testEveryMapBuilds() {
+        XCTAssertEqual(MapDatabase.all.count, 5)
+        for map in MapDatabase.all {
+            XCTAssertFalse(map.brushes.isEmpty, "\(map.id.value) has no geometry")
+            XCTAssertFalse(map.spawns.isEmpty, "\(map.id.value) has no spawns")
+        }
+    }
+
+    func testEveryBrushIsWellFormed() {
+        for map in MapDatabase.all {
+            for (index, brush) in map.brushes.enumerated() {
+                let box = brush.box
+                XCTAssertLessThanOrEqual(box.min.x, box.max.x, "\(map.id.value) brush \(index) x")
+                XCTAssertLessThanOrEqual(box.min.y, box.max.y, "\(map.id.value) brush \(index) y")
+                XCTAssertLessThanOrEqual(box.min.z, box.max.z, "\(map.id.value) brush \(index) z")
+                XCTAssertTrue(box.min.x.isFinite && box.min.y.isFinite && box.min.z.isFinite,
+                              "\(map.id.value) brush \(index) has a non-finite corner")
+                XCTAssertTrue(box.max.x.isFinite && box.max.y.isFinite && box.max.z.isFinite,
+                              "\(map.id.value) brush \(index) has a non-finite corner")
+            }
+        }
+    }
+
+    func testAABBOrdersItsCorners() {
+        let inverted = AABB(min: Vec3(5, 9, 2), max: Vec3(-1, 3, 7))
+        XCTAssertEqual(inverted.min, Vec3(-1, 3, 2))
+        XCTAssertEqual(inverted.max, Vec3(5, 9, 7))
+        XCTAssertEqual(inverted.size, Vec3(6, 6, 5))
+    }
+
+    func testCollisionWorldBuildsForEveryMap() {
+        // Building the grid is what actually crashed: it walks min-cell to max-cell as a
+        // range, so an inverted brush is a trap rather than a harmless oddity.
+        for map in MapDatabase.all {
+            let world = CollisionWorld(map: map)
+            let candidates = world.candidates(in: map.bounds)
+            XCTAssertFalse(candidates.isEmpty, "\(map.id.value) grid found no brushes")
+        }
+    }
+
+    func testDescendingStairsProduceWellFormedSteps() {
+        var author = MapAuthor()
+        author.stairs(x: -5...5, z: -9...(-5), from: 3.4, to: 0, steps: 7)
+        author.stairs(x: -5...5, z: 5...9, from: 0, to: 3.4, steps: 7)
+        XCTAssertEqual(author.brushes.count, 14)
+        for brush in author.brushes {
+            XCTAssertLessThan(brush.box.min.y, brush.box.max.y)
+            XCTAssertLessThan(brush.box.min.z, brush.box.max.z)
+        }
+        // The descending flight must actually descend.
+        let descending = author.brushes.prefix(7).map(\.box.max.y)
+        XCTAssertGreaterThan(descending.first!, descending.last!)
+    }
+
+    func testEverySpawnIsInsideTheMapBounds() {
+        for map in MapDatabase.all {
+            for spawn in map.spawns {
+                XCTAssertTrue(map.bounds.contains(spawn.position),
+                              "\(map.id.value) spawn at \(spawn.position) is outside the map")
+            }
+        }
+    }
+}

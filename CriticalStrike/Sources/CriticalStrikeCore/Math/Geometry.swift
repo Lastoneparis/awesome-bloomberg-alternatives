@@ -6,8 +6,14 @@ public struct AABB: Codable, Equatable, Sendable {
     public var min: Vec3
     public var max: Vec3
 
+    /// Orders the corners, so `min` really is the minimum on every axis.
+    ///
+    /// Everything downstream relies on it — the collision grid walks `cellIndex(min)` to
+    /// `cellIndex(max)` as a range, and an inverted box crashed the whole test suite on the
+    /// first map that was built. Cheap here, once, at authoring time; impossible to forget.
     public init(min: Vec3, max: Vec3) {
-        self.min = min; self.max = max
+        self.min = Vec3(Swift.min(min.x, max.x), Swift.min(min.y, max.y), Swift.min(min.z, max.z))
+        self.max = Vec3(Swift.max(min.x, max.x), Swift.max(min.y, max.y), Swift.max(min.z, max.z))
     }
 
     public init(center: Vec3, size: Vec3) {

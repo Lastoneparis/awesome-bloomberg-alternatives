@@ -143,19 +143,25 @@ public struct MapAuthor {
                                 to y1: Float, steps: Int = 8, alongZ: Bool = true,
                                 surface: SurfaceKind = .concrete) {
         let n = Swift.max(steps, 1)
+        // Each step is a solid from below the staircase up to its tread. The base has to be
+        // the lower of the two ends, not y0: a descending staircase (from: 3.4, to: 0) put
+        // the base above the tread from the second step on, which is an inverted box.
+        let base = Swift.min(y0, y1) - 0.5
         for i in 0..<n {
             let t0 = Float(i) / Float(n), t1 = Float(i + 1) / Float(n)
-            let h = y0 + (y1 - y0) * t1
+            let tread = Swift.max(y0 + (y1 - y0) * t1, base + 0.01)
             if alongZ {
                 let zLo = z.lowerBound + (z.upperBound - z.lowerBound) * t0
                 let zHi = z.lowerBound + (z.upperBound - z.lowerBound) * t1
-                brushes.append(MapBrush(box: AABB(min: Vec3(x.lowerBound, y0 - 0.5, zLo),
-                                                  max: Vec3(x.upperBound, h, zHi)), surface: surface))
+                brushes.append(MapBrush(box: AABB(min: Vec3(x.lowerBound, base, zLo),
+                                                  max: Vec3(x.upperBound, tread, zHi)),
+                                        surface: surface))
             } else {
                 let xLo = x.lowerBound + (x.upperBound - x.lowerBound) * t0
                 let xHi = x.lowerBound + (x.upperBound - x.lowerBound) * t1
-                brushes.append(MapBrush(box: AABB(min: Vec3(xLo, y0 - 0.5, z.lowerBound),
-                                                  max: Vec3(xHi, h, z.upperBound)), surface: surface))
+                brushes.append(MapBrush(box: AABB(min: Vec3(xLo, base, z.lowerBound),
+                                                  max: Vec3(xHi, tread, z.upperBound)),
+                                        surface: surface))
             }
         }
     }
