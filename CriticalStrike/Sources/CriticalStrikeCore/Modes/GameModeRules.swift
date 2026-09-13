@@ -700,6 +700,9 @@ public final class TrainingRules: GameModeRules {
 
     public func canRespawn(sim: MatchSimulation, player: PlayerID) -> Bool { true }
 
+    /// The range never ends on its own; the player leaves when they are done.
+    public func checkMatchEnd(sim: MatchSimulation) -> MatchResult? { nil }
+
     public func objectiveSummary(sim: MatchSimulation) -> ObjectiveSummary {
         ObjectiveSummary(headline: "Training Range", detail: "Practise spray control and lineups")
     }

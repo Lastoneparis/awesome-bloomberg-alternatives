@@ -172,7 +172,7 @@ extension MatchSimulation {
             events.emit(.bombDropped(position: dropPosition))
         }
         if let slot = victim.slots[victim.activeSlot], slot.resolvedWeapon.weaponClass != .melee,
-           state.mode.usesBuyMenu {
+           state.mode.kind.usesBuyMenu {
             spawnPickup(kind: .weapon, at: dropPosition + Vec3(0, 0.3, 0),
                         weapon: slot.build.weapon, ammo: slot.ammoInMagazine)
             events.emit(.weaponDropped(entity: EntityID(rawValue: 0), weapon: slot.build.weapon,
@@ -194,7 +194,6 @@ extension MatchSimulation {
     // MARK: - Explosions
 
     func resolveExplosion(_ explosion: ExplosionEvent) {
-        let data = explosion.data
         switch explosion.kind {
         case .flash:
             applyFlash(explosion)

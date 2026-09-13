@@ -30,7 +30,7 @@ public enum XPCurve {
 
     public static func progress(totalXP: Int) -> (level: Int, current: Int, required: Int, fraction: Float) {
         let level = self.level(forTotalXP: totalXP)
-        let consumed = totalXP(forLevel: level)
+        let consumed = XPCurve.totalXP(forLevel: level)
         let required = level >= maxLevel ? 0 : xpRequired(forLevel: level + 1)
         let current = totalXP - consumed
         let fraction = required > 0 ? MathUtil.clamp(Float(current) / Float(required), 0, 1) : 1
