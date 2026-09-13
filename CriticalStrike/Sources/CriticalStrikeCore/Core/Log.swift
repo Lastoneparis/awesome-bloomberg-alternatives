@@ -34,9 +34,19 @@ public enum Log {
         if let sink { sink(level, line) } else { print(line) }
     }
 
-    public static func verbose(_ m: @autoclosure () -> String, category: String = "game") { log(.verbose, m(), category: category) }
-    public static func debug(_ m: @autoclosure () -> String, category: String = "game") { log(.debug, m(), category: category) }
-    public static func info(_ m: @autoclosure () -> String, category: String = "game") { log(.info, m(), category: category) }
-    public static func warn(_ m: @autoclosure () -> String, category: String = "game") { log(.warning, m(), category: category) }
-    public static func error(_ m: @autoclosure () -> String, category: String = "game") { log(.error, m(), category: category) }
+    public static func verbose(_ m: @autoclosure () -> String, category: String = "game") {
+        log(.verbose, m(), category: category)
+    }
+    public static func debug(_ m: @autoclosure () -> String, category: String = "game") {
+        log(.debug, m(), category: category)
+    }
+    public static func info(_ m: @autoclosure () -> String, category: String = "game") {
+        log(.info, m(), category: category)
+    }
+    public static func warn(_ m: @autoclosure () -> String, category: String = "game") {
+        log(.warning, m(), category: category)
+    }
+    public static func error(_ m: @autoclosure () -> String, category: String = "game") {
+        log(.error, m(), category: category)
+    }
 }

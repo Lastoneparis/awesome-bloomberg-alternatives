@@ -17,16 +17,16 @@ This file is the checklist the build loop works through. Anything unchecked is n
 - [x] Maps (geometry, spawns, objectives, navigation, cover)
 
 ## Phase 3 — Simulation
-- [ ] Damage model (falloff, armor, penetration, hitboxes)
-- [ ] Movement (accel/friction, crouch, slide, jump, air control, ladders)
-- [ ] Weapon runtime state machine (fire/reload/ADS/switch/burst)
-- [ ] Recoil + spread model
-- [ ] Ballistics (hitscan, projectile, wallbang, ricochet)
-- [ ] Grenade physics + effects (frag/flash/smoke/molotov)
-- [ ] Collision world + spatial hash
-- [ ] Player state, spawn selection, pickups
-- [ ] Match/round state machine + all game modes
-- [ ] Scoring, killfeed, streaks, economy (buy menu)
+- [x] Damage model (falloff, armor, penetration, hitboxes)
+- [x] Movement (accel/friction, crouch, slide, jump, air control, ladders)
+- [x] Weapon runtime state machine (fire/reload/ADS/switch/burst)
+- [x] Recoil + spread model
+- [x] Ballistics (hitscan, projectile, wallbang, ricochet)
+- [x] Grenade physics + effects (frag/flash/smoke/molotov)
+- [x] Collision world + spatial hash
+- [x] Player state, spawn selection, pickups
+- [x] Match/round state machine + all game modes
+- [x] Scoring, killfeed, streaks, economy (buy menu)
 
 ## Phase 4 — AI
 - [ ] Bot perception (vision cones, hearing, memory)
