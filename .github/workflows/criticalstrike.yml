@@ -46,7 +46,10 @@ jobs:
         run: swift build --target CriticalStrikeCore
       - name: Run the simulation tests
         working-directory: CriticalStrike
-        run: swift test
+        # Through a pty, so XCTest's output is line buffered and progress actually appears
+        # in the log. Piped straight to a file it block-buffers, and a slow suite is
+        # indistinguishable from a hung one — which cost a lot of guessing.
+        run: script -q /dev/null swift test
 
   build-app:
     name: Build the iOS app
