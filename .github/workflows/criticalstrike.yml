@@ -39,11 +39,14 @@ jobs:
 
   build-app:
     name: Build the iOS app
-    runs-on: macos-14
+    # macos-15, and the image's default Xcode rather than a pinned one: current XcodeGen
+    # writes pbxproj object version 77, which Xcode 15.4 refuses to open outright, and
+    # XcodeGen has no option to write an older format.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+      - name: Show the toolchain
+        run: xcodebuild -version && xcodegen --version || true
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate the project
@@ -51,10 +54,12 @@ jobs:
         run: xcodegen generate
       - name: Build for the simulator
         working-directory: CriticalStrike
+        # A generic destination, so the build does not depend on which simulator devices
+        # happen to be installed on the image.
         run: |
           xcodebuild build \
             -project CriticalStrike.xcodeproj \
             -scheme CriticalStrike \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO

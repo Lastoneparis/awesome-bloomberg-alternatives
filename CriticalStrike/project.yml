@@ -14,10 +14,6 @@ options:
   generateEmptyDirectories: true
   groupSortPosition: top
   xcodeVersion: "15.0"
-  # Current XcodeGen writes pbxproj objectVersion 77, which only Xcode 16.3 and later can
-  # open — CI pins Xcode 15.4 and refused the generated project outright. 56 is the format
-  # Xcode 14 through 16 all read.
-  objectVersion: 56
 
 settings:
   base:
