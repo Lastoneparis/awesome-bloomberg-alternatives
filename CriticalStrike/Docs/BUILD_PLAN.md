@@ -29,19 +29,19 @@ This file is the checklist the build loop works through. Anything unchecked is n
 - [x] Scoring, killfeed, streaks, economy (buy menu)
 
 ## Phase 4 — AI
-- [ ] Bot perception (vision cones, hearing, memory)
-- [ ] Bot combat (aim model per difficulty, burst discipline, strafing)
-- [ ] Bot navigation (nav graph, A*, waypoint following)
-- [ ] Bot objective behaviour per mode + difficulty tuning
+- [x] Bot perception (vision cones, hearing, memory)
+- [x] Bot combat (aim model per difficulty, burst discipline, strafing)
+- [x] Bot navigation (nav graph, A*, waypoint following)
+- [x] Bot objective behaviour per mode + difficulty tuning
 
 ## Phase 5 — Netcode
-- [ ] Binary packet codec (bit-packing, quantization, delta compression)
-- [ ] Protocol messages (handshake, input, snapshot, events, chat)
-- [ ] Server simulation host (authoritative)
-- [ ] Client prediction + reconciliation + entity interpolation
-- [ ] Lag compensation (hit rewind)
-- [ ] Matchmaking / lobby / party types
-- [ ] Anti-cheat sanity validation
+- [x] Binary packet codec (bit-packing, quantization, delta compression)
+- [x] Protocol messages (handshake, input, snapshot, events, chat)
+- [x] Server simulation host (authoritative)
+- [x] Client prediction + reconciliation + entity interpolation
+- [x] Lag compensation (hit rewind)
+- [x] Matchmaking / lobby / party types
+- [x] Anti-cheat sanity validation
 
 ## Phase 6 — Economy & progression
 - [ ] Currencies, store catalog, bundles
