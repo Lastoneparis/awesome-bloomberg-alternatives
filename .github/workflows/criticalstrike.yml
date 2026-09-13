@@ -1,0 +1,56 @@
+name: Critical Strike
+
+on:
+  push:
+    paths:
+      - 'CriticalStrike/**'
+      - '.github/workflows/criticalstrike.yml'
+  pull_request:
+    paths:
+      - 'CriticalStrike/**'
+      - '.github/workflows/criticalstrike.yml'
+
+jobs:
+  static-checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Swift sources
+        run: python3 CriticalStrike/Tools/validate.py
+
+  build-and-test:
+    name: Build and test the core
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+      - name: Build the core library
+        working-directory: CriticalStrike
+        run: swift build --target CriticalStrikeCore
+      - name: Run the simulation tests
+        working-directory: CriticalStrike
+        run: swift test
+
+  build-app:
+    name: Build the iOS app
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the project
+        working-directory: CriticalStrike
+        run: xcodegen generate
+      - name: Build for the simulator
+        working-directory: CriticalStrike
+        run: |
+          xcodebuild build \
+            -project CriticalStrike.xcodeproj \
+            -scheme CriticalStrike \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
