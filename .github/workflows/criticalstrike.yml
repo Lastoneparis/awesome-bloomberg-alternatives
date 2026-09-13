@@ -22,6 +22,8 @@ jobs:
         run: python3 CriticalStrike/Tools/symbolcheck.py
       - name: Check initializer argument order
         run: python3 CriticalStrike/Tools/argorder.py
+      - name: Check protocol conformances
+        run: python3 CriticalStrike/Tools/conformance.py
 
   build-and-test:
     name: Build and test the core

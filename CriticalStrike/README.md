@@ -58,7 +58,10 @@ The core library also builds standalone on any platform with a Swift toolchain:
 ```sh
 swift build
 swift test
-python3 Tools/validate.py    # static checks with no toolchain at all
+python3 Tools/validate.py     # delimiters, duplicate declarations, known mistakes
+python3 Tools/symbolcheck.py  # every referenced type is declared somewhere
+python3 Tools/argorder.py     # Swift requires arguments in declaration order
+python3 Tools/conformance.py  # every type claiming a protocol implements it
 ```
 
 ## What is implemented
