@@ -16,8 +16,17 @@ final class MathTests: XCTestCase {
     }
 
     func testAngleWrapping() {
-        XCTAssertEqual(MathUtil.wrapAngle(3 * .pi), .pi, accuracy: 0.0001)
-        XCTAssertEqual(MathUtil.wrapAngle(-3 * .pi), .pi, accuracy: 0.0001)
+        // +pi and -pi are the same angle, and which side of the boundary 3*pi lands on
+        // after a float remainder is not a property worth asserting — it flipped to -pi on
+        // the CI machine and the test failed on a difference of one ulp. What matters is
+        // that the result is in range and still points the same way.
+        for input in [3 * Float.pi, -3 * Float.pi, .pi, -.pi, 7.3, -7.3, 0, 0.5] {
+            let wrapped = MathUtil.wrapAngle(input)
+            XCTAssertLessThanOrEqual(abs(wrapped), Float.pi + 1e-5,
+                                     "\(input) wrapped to \(wrapped), outside the range")
+            XCTAssertLessThan(abs(MathUtil.angleDelta(input, wrapped)), 1e-4,
+                              "\(input) wrapped to \(wrapped), which is a different angle")
+        }
         XCTAssertEqual(MathUtil.angleDelta(3.0, -3.0), 0.2831853, accuracy: 0.001)
     }
 

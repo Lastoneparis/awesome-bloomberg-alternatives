@@ -49,30 +49,37 @@ jobs:
       # other suite still reports. Output goes through a pty so XCTest line-buffers it —
       # piped, it block-buffers and a slow suite looks exactly like a hung one.
       - name: Test maths
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 5
         run: script -q /dev/null swift test --filter "MathTests|NoiseTests|ScalarFieldTests|RGBTests"
       - name: Test audio synthesis
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 8
         run: script -q /dev/null swift test --filter "WaveformTests|SynthTests|SoundBankTests"
       - name: Test combat
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 5
         run: script -q /dev/null swift test --filter "DamageModelTests|WeaponBalanceTests"
       - name: Test economy and progression
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 5
         run: script -q /dev/null swift test --filter "WalletTests|LootCrateTests|ProgressionTests|BattlePassTests|MissionTests|PersistenceTests|ContentIntegrityTests|SocialTests"
       - name: Test netcode
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 6
         run: script -q /dev/null swift test --filter "BitStreamTests|ProtocolTests|SnapshotTests|InterpolationBufferTests|LagCompensationTests|AntiCheatTests|TransportTests"
       - name: Test simulation
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 8
         run: script -q /dev/null swift test --filter "CollisionTests|MovementTests|WeaponSystemTests|BallisticsTests|MatchFlowTests|MapIntegrityTests"
       - name: Test navigation
+        if: ${{ !cancelled() }}
         working-directory: CriticalStrike
         timeout-minutes: 8
         run: script -q /dev/null swift test --filter "NavigationTests"
