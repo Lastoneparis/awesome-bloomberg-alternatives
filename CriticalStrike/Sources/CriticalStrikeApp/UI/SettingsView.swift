@@ -315,6 +315,42 @@ struct SettingsView: View {
     }
 }
 
+/// One draggable HUD element.
+///
+/// Extracted from the editor's body rather than written inline: the chain of eleven
+/// modifiers, two gestures and four ternaries inside a GeometryReader inside a ForEach was
+/// a single expression, and the compiler gave up on it with "unable to type-check this
+/// expression in reasonable time". Splitting a SwiftUI body into real views is the fix
+/// for that, every time.
+private struct HUDElementChip: View {
+    let label: String
+    let layout: HUDElementLayout
+    let isSelected: Bool
+    let canvasSize: CGSize
+    let onDrag: (CGPoint) -> Void
+    let onTap: () -> Void
+
+    private var foreground: Color { isSelected ? Theme.accent : Theme.textPrimary }
+    private var fill: Color { isSelected ? Theme.accent.opacity(0.25) : Theme.surfaceElevated }
+    private var border: Color { isSelected ? Theme.accent : Theme.stroke }
+
+    var body: some View {
+        Text(label)
+            .font(Theme.caption(10))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 8).fill(fill))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(border, lineWidth: 1))
+            .scaleEffect(CGFloat(layout.scale))
+            .opacity(layout.hidden ? 0.35 : Double(layout.opacity))
+            .position(x: canvasSize.width * CGFloat(layout.x),
+                      y: canvasSize.height * CGFloat(layout.y))
+            .gesture(DragGesture().onChanged { onDrag($0.location) })
+            .onTapGesture(perform: onTap)
+    }
+}
+
 /// Drag-to-position HUD editor. Everything it writes is the same `HUDElementLayout` the
 /// live HUD reads, so what you arrange here is exactly what you play with.
 struct HUDLayoutEditorView: View {
@@ -354,33 +390,19 @@ struct HUDLayoutEditorView: View {
                 Color.black.opacity(0.9).ignoresSafeArea()
 
                 ForEach(editableElements) { element in
-                    let layout = app.profile.settings.layout(for: element.id)
-                    Text(element.label)
-                        .font(Theme.caption(10))
-                        .foregroundStyle(selected == element.id ? Theme.accent : Theme.textPrimary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(RoundedRectangle(cornerRadius: 8)
-                            .fill(selected == element.id
-                                  ? Theme.accent.opacity(0.25) : Theme.surfaceElevated))
-                        .overlay(RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(selected == element.id ? Theme.accent : Theme.stroke,
-                                          lineWidth: 1))
-                        .scaleEffect(CGFloat(layout.scale))
-                        .opacity(layout.hidden ? 0.35 : Double(layout.opacity))
-                        .position(x: geometry.size.width * CGFloat(layout.x),
-                                  y: geometry.size.height * CGFloat(layout.y))
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    selected = id
-                                    var updated = layout
-                                    updated.x = Float(min(max(value.location.x / geometry.size.width, 0.04), 0.96))
-                                    updated.y = Float(min(max(value.location.y / geometry.size.height, 0.05), 0.95))
-                                    app.updateSettings { $0.updateLayout(updated) }
-                                }
-                        )
-                        .onTapGesture { selected = element.id }
+                    HUDElementChip(
+                        label: element.label,
+                        layout: app.profile.settings.layout(for: element.id),
+                        isSelected: selected == element.id,
+                        canvasSize: geometry.size,
+                        onDrag: { location in
+                            selected = element.id
+                            var updated = app.profile.settings.layout(for: element.id)
+                            updated.x = Float(min(max(location.x / geometry.size.width, 0.04), 0.96))
+                            updated.y = Float(min(max(location.y / geometry.size.height, 0.05), 0.95))
+                            app.updateSettings { $0.updateLayout(updated) }
+                        },
+                        onTap: { selected = element.id })
                 }
 
                 VStack {
