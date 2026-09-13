@@ -33,6 +33,7 @@ namespace Salvo.Headless
             // loop around them, so it lives in its own file rather than as a branch through
             // this one.
             if (options.Networked) return NetworkedRun.Run(options);
+            if (options.Matchmaking) return MatchmakingRun.Run(options);
 
             GameContent content = StarterContent.Build();
 

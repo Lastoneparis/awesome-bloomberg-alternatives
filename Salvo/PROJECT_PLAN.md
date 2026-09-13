@@ -30,7 +30,7 @@ ranked ladders, a store. The architecture leaves room for each; none is implemen
 | 4 | First map (Modern world) | Greybox with routes, cover, spawns, validated by tooling | not started |
 | 5 | Bots | 4 difficulties, navigation, cover, objectives | partly — 4 difficulties done and measured; navigation is steering, not pathfinding |
 | 6 | Networking | Server-authoritative, prediction, reconciliation, lag comp | **simulation side done** — measured over a lossy link; no real transport yet |
-| 7 | Lobby / matchmaking / private match | Create, invite, join, ready, start | not started |
+| 7 | Lobby / matchmaking / private match | Create, invite, join, ready, start | **matchmaking rules done** — no session service |
 | 8 | Friends / parties | Add, accept, invite, block, report | **rules done** — graph and party enforced and tested; no service, no reporting |
 | 9 | Mobile controls | Customisable HUD, haptics, safe areas | not started |
 | 10 | Mac controls | KBM, remapping, sensitivity, FOV, windowed/fullscreen | not started |

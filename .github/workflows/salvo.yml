@@ -122,6 +122,19 @@ jobs:
               --mode mode.overload --bots 10 --seconds 900 --difficulty "$difficulty"
           done
 
+      - name: Run matchmaking over a population, on several seeds
+        if: ${{ !cancelled() }}
+        # Queues sixty players in parties of varying size with blocks scattered through them,
+        # forms matches, and checks the rules held across every match formed. Unit tests check
+        # each rule against two or three hand-written tickets; this is what found the matchmaker
+        # dropping selected-but-unplaceable tickets out of the queue entirely, and a party whose
+        # own members had blocked each other passing every check.
+        run: |
+          for seed in 1 2 3 4 5 6 7 8; do
+            echo "--- seed $seed"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --matchmaking --seed "$seed"
+          done
+
       - name: A match replays identically from its seed
         if: ${{ !cancelled() }}
         # Client-side prediction depends on this absolutely. The wall-clock line is excluded

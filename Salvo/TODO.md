@@ -287,6 +287,51 @@ entry protects nobody and can only serve as a record of who someone once blocked
 
 ---
 
+## Matchmaking  *(rules and balancing)*
+
+- [x] `MatchmakingTicket` — a party in the queue; a solo is a party of one, with no special case
+- [x] `Matchmaker` — selection, avoidance, team assignment, map choice, bot fill
+- [x] `MatchProposal` — a formed match, usable directly as `MatchSimulation` input
+- [x] `salvo-headless --matchmaking` — queues sixty in parties and checks every match formed
+- [x] 33 tests
+
+### Four rules, in priority order
+
+The order is the design, because the rules conflict — perfect balance is easy if you may split
+parties and ignore blocks.
+
+1. **Blocked players never share a match.** Not merely never share a team: in the same match, A
+   still sees B's name, is shot by B, and can be followed by B.
+2. **A party is never split.** People queue together to play together.
+3. **Teams are even in size**, counting bots.
+4. **Teams are close in skill** — the only rule that bends, widening with wait time.
+
+Rule 1 is never relaxed to fill a lobby. That trade — a visible empty queue, which players
+understand and metrics record, for an invisible one where somebody is matched with a person
+they deliberately avoided and nothing notes it — is not one to make silently. Avoidance is
+counted and reported *even when a match forms anyway*, which is the case that matters most: the
+queue fills fine, nothing looks wrong, and one player is quietly never matched with anybody.
+
+### Two bugs the volume run found that the unit tests did not
+
+- A ticket the matchmaker selected but could not fit on either side was **removed from the
+  queue and placed in no match**. A sixty-player run showed 56 placed and none still waiting.
+- A party whose own members had blocked each other passed every check, because avoidance was
+  only tested against already-chosen accounts. Such a party should not exist, but the matchmaker
+  receives tickets rather than parties and cannot verify where they came from.
+
+Both are now unit-tested, and both safety rules were verified by breaking them: relaxing
+avoidance fails five tests, and filling teams in queue order fails the skill-spread test.
+
+### Known gaps
+- [ ] Skill is a placeholder derived from career record, not a rating system.
+- [ ] No regions, no latency-based matching, no backfill into a match in progress.
+- [ ] Nothing consumes `MatchProposal` in production — there is no session service to hand it to.
+- [ ] Human team balance is not asserted: with unsplittable parties a lobby of one five-stack
+      has no even human split, so bots even the sides and the imbalance is reported, not failed.
+
+---
+
 ## Known issues / decisions deferred
 
 - [ ] **Trademark search for "SALVO"** before any public use. Codename only.

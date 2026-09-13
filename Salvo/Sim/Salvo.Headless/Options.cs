@@ -15,6 +15,8 @@ namespace Salvo.Headless
   --seed <n>         match seed; the same seed replays identically (default 1)
   --seconds <n>      stop after this much match time (default 180)
   --verbose          print kills as they happen
+  --matchmaking      queue a population of parties, form matches, and check the
+                     rules held across every match formed
   --net              run a real networked match: authoritative server, predicting
                      clients, and a lossy link, all in one process
   --link <profile>   perfect | mobile | poor (default mobile). Only with --net.
@@ -31,6 +33,7 @@ Exits 0 if the match ran cleanly, 1 if the run found a problem, 2 on bad input."
         public bool Verbose;
         public bool ShowHelp;
         public bool Networked;
+        public bool Matchmaking;
         public string NetworkProfile = "mobile";
 
         public static Options Parse(string[] args)
@@ -53,6 +56,7 @@ Exits 0 if the match ran cleanly, 1 if the run found a problem, 2 on bad input."
                         break;
                     case "--verbose": options.Verbose = true; break;
                     case "--net": options.Networked = true; break;
+                    case "--matchmaking": options.Matchmaking = true; break;
                     case "--link": options.NetworkProfile = Next(); break;
                     case "--help":
                     case "-h": options.ShowHelp = true; break;
