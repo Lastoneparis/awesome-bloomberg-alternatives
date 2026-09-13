@@ -6,7 +6,7 @@ public struct PickupInstance: Sendable {
     public var position: Vec3
     public var weapon: WeaponID?
     public var ammo: Int
-    public var respawnTimer: Timer
+    public var respawnTimer: Countdown
     public var isActive: Bool
     public var droppedByPlayer: Bool
     public var dogTagOwner: PlayerID
@@ -442,7 +442,7 @@ public final class MatchSimulation {
             nextPickupEntity = nextPickupEntity &+ 1
             return PickupInstance(entity: EntityID(rawValue: 2000 + UInt16(index)),
                                   kind: spawn.kind, position: spawn.position,
-                                  weapon: spawn.weapon, ammo: 0, respawnTimer: Timer(),
+                                  weapon: spawn.weapon, ammo: 0, respawnTimer: Countdown(),
                                   isActive: true, droppedByPlayer: false,
                                   dogTagOwner: .none, dogTagTeam: .none)
         }
@@ -461,7 +461,7 @@ public final class MatchSimulation {
         nextPickupEntity = nextPickupEntity &+ 1
         let entity = EntityID(rawValue: 3000 &+ nextPickupEntity)
         pickups.append(PickupInstance(entity: entity, kind: kind, position: position,
-                                      weapon: weapon, ammo: ammo, respawnTimer: Timer(),
+                                      weapon: weapon, ammo: ammo, respawnTimer: Countdown(),
                                       isActive: true, droppedByPlayer: true,
                                       dogTagOwner: dogTagOwner, dogTagTeam: dogTagTeam))
         events.emit(.pickupSpawned(entity: entity, position: position, kind: kind))

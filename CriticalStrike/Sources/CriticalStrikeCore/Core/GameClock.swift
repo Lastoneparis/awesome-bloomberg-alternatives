@@ -46,7 +46,12 @@ public struct GameClock: Sendable {
 }
 
 /// Simple countdown used all over the sim (reload, round timer, bomb, respawn).
-public struct Timer: Codable, Equatable, Sendable {
+///
+/// Named `Countdown` rather than `Timer` because a public `Timer` in a module that gets
+/// imported alongside Foundation shadows `Foundation.Timer` in every such file. It already
+/// cost two `Foundation.Timer` qualifications in the app and broke the test target
+/// outright, where XCTest brings Foundation in.
+public struct Countdown: Codable, Equatable, Sendable {
     public private(set) var remaining: Float
     public private(set) var duration: Float
 

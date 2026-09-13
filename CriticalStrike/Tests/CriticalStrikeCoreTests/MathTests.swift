@@ -91,7 +91,7 @@ final class MathTests: XCTestCase {
     }
 
     func testTimerFiresExactlyOnce() {
-        var timer = Timer()
+        var timer = Countdown()
         timer.start(0.1)
         XCTAssertFalse(timer.tick(0.05))
         XCTAssertTrue(timer.tick(0.06))

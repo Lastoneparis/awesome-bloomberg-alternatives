@@ -114,16 +114,26 @@ final class ProtocolTests: XCTestCase {
 
 final class SnapshotTests: XCTestCase {
     private func makeSnapshot(tick: UInt32, playerCount: Int, offset: Float) -> WorldSnapshot {
-        let players = (0..<playerCount).map { index in
-            PlayerSnapshot(id: PlayerID(index), team: index % 2 == 0 ? .strike : .shield,
-                           position: Vec3(Float(index) + offset, 0.1, -Float(index)),
-                           velocity: Vec3(1, 0, 0), yaw: 0.5, pitch: -0.1,
-                           health: 100, armor: 50, isAlive: true, stance: .standing,
-                           weapon: "ar_vanguard", ammoInMagazine: 30,
-                           isFiring: false, isReloading: false, isAiming: false,
-                           kills: UInt8(index), deaths: 0, score: UInt16(index * 100))
+        // Every sub-expression is annotated and hoisted out of the initializer call. An
+        // eighteen-argument initializer full of unannotated numeric literals is the classic
+        // way to push Swift's type checker past its time limit, and it did: this expression
+        // failed to compile with "unable to type-check in reasonable time".
+        let players: [PlayerSnapshot] = (0..<playerCount).map { index -> PlayerSnapshot in
+            let team: Team = index % 2 == 0 ? .strike : .shield
+            let position = Vec3(Float(index) + offset, 0.1, -Float(index))
+            let velocity = Vec3(1, 0, 0)
+            let kills = UInt8(index)
+            let score = UInt16(index * 100)
+            return PlayerSnapshot(id: PlayerID(index), team: team,
+                                  position: position,
+                                  velocity: velocity, yaw: 0.5, pitch: -0.1,
+                                  health: 100, armor: 50, isAlive: true, stance: .standing,
+                                  weapon: "ar_vanguard", ammoInMagazine: 30,
+                                  isFiring: false, isReloading: false, isAiming: false,
+                                  kills: kills, deaths: 0, score: score)
         }
-        return WorldSnapshot(tick: tick, serverTime: Float(tick) / 64, phase: .live,
+        let serverTime = Float(tick) / 64
+        return WorldSnapshot(tick: tick, serverTime: serverTime, phase: .live,
                              phaseTimeRemaining: 120, strikeScore: 3, shieldScore: 5, round: 1,
                              players: players, projectiles: [], bombPlanted: false,
                              bombPosition: .zero, bombTimeRemaining: 0)

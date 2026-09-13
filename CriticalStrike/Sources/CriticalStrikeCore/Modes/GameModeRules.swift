@@ -641,7 +641,7 @@ public final class OneInTheChamberRules: GameModeRules {
 
 public final class ZombieRules: GameModeRules {
     public let kind: GameModeKind = .zombies
-    private var waveTimer = Timer()
+    private var waveTimer = Countdown()
     private var zombiesAlive = 0
     public init() {}
 

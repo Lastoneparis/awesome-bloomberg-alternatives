@@ -5,7 +5,7 @@ This file is the checklist the build loop works through. Anything unchecked is n
 ## Phase 1 — Core foundations
 - [x] SPM manifest, folder layout
 - [x] Math (Vec3, ViewAngles, MathUtil, deterministic RNG, AABB/Ray/Sphere)
-- [x] Core (EntityID/PlayerID/Team, GameClock+Timer, EventBus, Log)
+- [x] Core (EntityID/PlayerID/Team, GameClock+Countdown, EventBus, Log)
 
 ## Phase 2 — Content data
 - [x] WeaponData + 18-weapon roster + spray patterns

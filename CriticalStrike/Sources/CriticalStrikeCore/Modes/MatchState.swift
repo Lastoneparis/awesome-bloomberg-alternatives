@@ -24,15 +24,15 @@ public struct BombState: Codable, Sendable {
     public var hasExploded: Bool
     public var site: Int
     public var position: Vec3
-    public var timer: Timer
+    public var timer: Countdown
     public var defuser: PlayerID
-    public var defuseTimer: Timer
+    public var defuseTimer: Countdown
     public var planter: PlayerID
 
     public init() {
         carrier = .none; isPlanted = false; isDefused = false; hasExploded = false
-        site = -1; position = .zero; timer = Timer(); defuser = .none
-        defuseTimer = Timer(); planter = .none
+        site = -1; position = .zero; timer = Countdown(); defuser = .none
+        defuseTimer = Countdown(); planter = .none
     }
 
     public static let plantDuration: Float = 3.2
@@ -62,15 +62,15 @@ public struct MatchState: Sendable {
     public var mode: GameModeData
     public var mapID: MapID
     public var phase: MatchPhase
-    public var phaseTimer: Timer
-    public var matchTimer: Timer
+    public var phaseTimer: Countdown
+    public var matchTimer: Countdown
     public var round: Int
     public var scores: [Team: Int]
     public var roundWins: [Team: Int]
     public var bomb: BombState
     public var captures: [CaptureState]
     public var activeHardpoint: Int
-    public var hardpointRotationTimer: Timer
+    public var hardpointRotationTimer: Countdown
     public var sidesSwapped: Bool
     public var overtimeRound: Int
     public var firstBloodTaken: Bool
@@ -80,15 +80,15 @@ public struct MatchState: Sendable {
         self.mode = mode
         self.mapID = mapID
         self.phase = .warmup
-        self.phaseTimer = Timer()
-        self.matchTimer = Timer()
+        self.phaseTimer = Countdown()
+        self.matchTimer = Countdown()
         self.round = 0
         self.scores = [.strike: 0, .shield: 0, .none: 0]
         self.roundWins = [.strike: 0, .shield: 0]
         self.bomb = BombState()
         self.captures = []
         self.activeHardpoint = 0
-        self.hardpointRotationTimer = Timer()
+        self.hardpointRotationTimer = Countdown()
         self.sidesSwapped = false
         self.overtimeRound = 0
         self.firstBloodTaken = false

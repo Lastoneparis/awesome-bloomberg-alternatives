@@ -8,7 +8,7 @@ public struct Projectile: Sendable {
     public var kind: GrenadeKind
     public var position: Vec3
     public var velocity: Vec3
-    public var fuse: Timer
+    public var fuse: Countdown
     public var bounces: Int
     public var stuck: Bool
 
@@ -23,7 +23,7 @@ public struct AreaEffect: Sendable {
     public var kind: GrenadeKind
     public var position: Vec3
     public var radius: Float
-    public var timer: Timer
+    public var timer: Countdown
     public var lastTickDamage: Float
 
     public var blocksVision: Bool { kind == .smoke }
@@ -69,7 +69,7 @@ public final class ProjectileSystem {
                       origin: Vec3, velocity: Vec3, events: EventBus) -> EntityID {
         let data = GrenadeDatabase.grenade(grenadeID) ?? GrenadeDatabase.grenade(kind: kind)
         let entity = allocateEntity()
-        var fuse = Timer()
+        var fuse = Countdown()
         fuse.start(data.fuseTime)
         projectiles.append(Projectile(entity: entity, owner: owner, team: team,
                                       grenadeID: grenadeID, kind: kind, position: origin,
@@ -140,21 +140,21 @@ public final class ProjectileSystem {
         guard data.effectDuration > 0, data.effectRadius > 0 else { return }
         switch p.kind {
         case .smoke:
-            var timer = Timer(); timer.start(data.effectDuration)
+            var timer = Countdown(); timer.start(data.effectDuration)
             areaEffects.append(AreaEffect(entity: p.entity, owner: p.owner, team: p.team,
                                           kind: .smoke, position: p.position,
                                           radius: data.effectRadius, timer: timer, lastTickDamage: 0))
             events.emit(.smokeStarted(entity: p.entity, position: p.position,
                                       radius: data.effectRadius, duration: data.effectDuration))
         case .molotov:
-            var timer = Timer(); timer.start(data.effectDuration)
+            var timer = Countdown(); timer.start(data.effectDuration)
             areaEffects.append(AreaEffect(entity: p.entity, owner: p.owner, team: p.team,
                                           kind: .molotov, position: p.position,
                                           radius: data.effectRadius, timer: timer, lastTickDamage: 0))
             events.emit(.fireStarted(entity: p.entity, position: p.position,
                                      radius: data.effectRadius, duration: data.effectDuration))
         case .decoy:
-            var timer = Timer(); timer.start(data.effectDuration)
+            var timer = Countdown(); timer.start(data.effectDuration)
             areaEffects.append(AreaEffect(entity: p.entity, owner: p.owner, team: p.team,
                                           kind: .decoy, position: p.position,
                                           radius: data.effectRadius, timer: timer, lastTickDamage: 0))

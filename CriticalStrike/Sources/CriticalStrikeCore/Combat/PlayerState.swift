@@ -82,8 +82,8 @@ public struct PlayerState: Codable, Sendable {
     public var slots: [LoadoutSlot: WeaponSlotState]
     public var activeSlot: LoadoutSlot
     public var action: WeaponAction
-    public var actionTimer: Timer
-    public var slideTimer: Timer
+    public var actionTimer: Countdown
+    public var slideTimer: Countdown
     /// Set when a weapon switch is queued behind the holster animation.
     public var pendingSlot: LoadoutSlot?
     /// Set while a grenade is being wound up.
@@ -133,7 +133,7 @@ public struct PlayerState: Codable, Sendable {
     public var damageDealt: Float
     public var headshots: Int
     public var gunGameLevel: Int
-    public var respawnTimer: Timer
+    public var respawnTimer: Countdown
     public var perks: PerkEffects
     public var loadout: Loadout
 
@@ -156,7 +156,7 @@ public struct PlayerState: Codable, Sendable {
         self.hasHelmet = false; self.lastDamagedAt = -999; self.lastAttacker = .none
         self.slots = [:]
         self.activeSlot = .primary
-        self.action = .ready; self.actionTimer = Timer(); self.slideTimer = Timer()
+        self.action = .ready; self.actionTimer = Countdown(); self.slideTimer = Countdown()
         self.pendingSlot = nil; self.pendingGrenade = nil; self.semiTriggerReady = true
         self.isUsing = false
         self.fireCooldown = 0
@@ -173,7 +173,7 @@ public struct PlayerState: Codable, Sendable {
         self.plantProgress = 0; self.defuseProgress = 0
         self.kills = 0; self.deaths = 0; self.assists = 0; self.score = 0
         self.currentStreak = 0; self.bestStreak = 0; self.damageDealt = 0; self.headshots = 0
-        self.gunGameLevel = 0; self.respawnTimer = Timer()
+        self.gunGameLevel = 0; self.respawnTimer = Countdown()
         self.perks = effects; self.loadout = loadout
         self.lastFootstepDistance = 0; self.lastFireTime = -999
         self.lastNoiseTime = -999; self.lastNoisePosition = .zero
