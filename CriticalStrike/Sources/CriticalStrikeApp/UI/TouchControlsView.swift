@@ -153,7 +153,7 @@ struct TouchControlsView: View {
                 if pressed { onPingRequested() }
             }
             scoreboardButton
-            if session.mode.usesBuyMenu && hud.phase == .freezeTime {
+            if session.mode.kind.usesBuyMenu && hud.phase == .freezeTime {
                 buyButton
             }
         }

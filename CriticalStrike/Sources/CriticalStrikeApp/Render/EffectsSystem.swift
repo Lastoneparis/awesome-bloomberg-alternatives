@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 import SceneKit
 import UIKit
 import CriticalStrikeCore
@@ -118,7 +119,9 @@ final class EffectsSystem {
             // tracer — a solid box reads as a stick from the side and vanishes head on.
             let plane = SCNPlane(width: 0.05, height: 1)
             let node = SCNNode(geometry: plane)
-            node.constraints = [SCNBillboardConstraint(freeAxes: .Y)]
+            let billboard = SCNBillboardConstraint()
+            billboard.freeAxes = .Y
+            node.constraints = [billboard]
             node.isHidden = true
             node.castsShadow = false
             root.addChildNode(node)
@@ -460,8 +463,14 @@ final class EffectsSystem {
         system.particleAngleVariation = 180
         system.particleAngularVelocity = 12
         system.particleAngularVelocityVariation = 24
-        // Fade the cloud in over the first second so it does not pop.
-        system.particleOpacity = 0.9
+        // Opacity over a particle's lifetime is a property controller, not a scalar: this
+        // ramps each puff in and back out so the cloud neither pops nor ends abruptly.
+        let opacity = CAKeyframeAnimation(keyPath: "opacity")
+        opacity.values = [0.0, 0.9, 0.9, 0.0]
+        opacity.keyTimes = [0.0, 0.12, 0.75, 1.0]
+        opacity.duration = 1
+        let controller = SCNParticlePropertyController(animation: opacity)
+        system.propertyControllers = [.opacity: controller]
         node.addParticleSystem(system)
 
         root.addChildNode(node)

@@ -587,7 +587,7 @@ final class GameSession: NSObject, ObservableObject {
     }
 
     func toggleBuyMenu() {
-        guard mode.usesBuyMenu else { return }
+        guard mode.kind.usesBuyMenu else { return }
         showBuyMenu.toggle()
     }
 
