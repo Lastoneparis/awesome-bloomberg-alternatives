@@ -17,8 +17,8 @@ public enum Synth {
     /// White noise from the deterministic generator, so a given sound is byte-identical
     /// every run — which is what lets the results be cached and tested.
     public static func noise(seconds: Float, seed: UInt64,
-                             sampleRate: Float = AudioBuffer.defaultSampleRate) -> AudioBuffer {
-        var buffer = AudioBuffer(sampleRate: sampleRate, seconds: seconds)
+                             sampleRate: Float = Waveform.defaultSampleRate) -> Waveform {
+        var buffer = Waveform(sampleRate: sampleRate, seconds: seconds)
         var random = DeterministicRandom(seed: seed)
         for index in buffer.samples.indices {
             buffer.samples[index] = random.signedUnit()
@@ -28,7 +28,7 @@ public enum Synth {
 
     public static func tone(frequency: Float, seconds: Float, wave: Wave = .sine,
                             phase: Float = 0,
-                            sampleRate: Float = AudioBuffer.defaultSampleRate) -> AudioBuffer {
+                            sampleRate: Float = Waveform.defaultSampleRate) -> Waveform {
         sweep(from: frequency, to: frequency, seconds: seconds, wave: wave,
               phase: phase, sampleRate: sampleRate)
     }
@@ -38,8 +38,8 @@ public enum Synth {
     public static func sweep(from startFrequency: Float, to endFrequency: Float,
                              seconds: Float, wave: Wave = .sine, curve: Float = 2.5,
                              phase: Float = 0,
-                             sampleRate: Float = AudioBuffer.defaultSampleRate) -> AudioBuffer {
-        var buffer = AudioBuffer(sampleRate: sampleRate, seconds: seconds)
+                             sampleRate: Float = Waveform.defaultSampleRate) -> Waveform {
+        var buffer = Waveform(sampleRate: sampleRate, seconds: seconds)
         guard buffer.count > 0 else { return buffer }
         var accumulated = phase
         let inverseRate = 1 / sampleRate
@@ -75,8 +75,8 @@ public enum Synth {
     /// Attack–hold–decay with an exponential tail. `curve` above 1 makes the decay hug the
     /// axis, which is what a real transient does and what keeps a gunshot from sounding
     /// like a drum machine.
-    public static func envelope(_ buffer: AudioBuffer, attack: Float, hold: Float = 0,
-                                decay: Float, curve: Float = 3) -> AudioBuffer {
+    public static func envelope(_ buffer: Waveform, attack: Float, hold: Float = 0,
+                                decay: Float, curve: Float = 3) -> Waveform {
         var out = buffer
         let rate = buffer.sampleRate
         let attackSamples = Swift.max(1, Int(attack * rate))
@@ -98,7 +98,7 @@ public enum Synth {
     }
 
     /// A pure exponential decay, for tails that should never quite reach zero abruptly.
-    public static func decay(_ buffer: AudioBuffer, halfLife: Float) -> AudioBuffer {
+    public static func decay(_ buffer: Waveform, halfLife: Float) -> Waveform {
         var out = buffer
         guard halfLife > 0 else { return out }
         let perSample = pow(0.5, 1 / (halfLife * buffer.sampleRate))
@@ -117,8 +117,8 @@ public enum Synth {
     /// load time without anyone noticing.
     public enum FilterMode { case lowPass, bandPass, highPass }
 
-    public static func filter(_ buffer: AudioBuffer, mode: FilterMode, cutoff: Float,
-                              resonance: Float = 0.7) -> AudioBuffer {
+    public static func filter(_ buffer: Waveform, mode: FilterMode, cutoff: Float,
+                              resonance: Float = 0.7) -> Waveform {
         var out = buffer
         let nyquist = buffer.sampleRate * 0.5
         let clampedCutoff = MathUtil.clamp(cutoff, 10, nyquist * 0.98)
@@ -145,8 +145,8 @@ public enum Synth {
 
     /// A filter whose cutoff moves across the buffer — a gunshot's tail dulls as it
     /// travels, and a static filter makes the whole thing sound like it is behind a door.
-    public static func sweepingLowPass(_ buffer: AudioBuffer, from startCutoff: Float,
-                                       to endCutoff: Float, resonance: Float = 0.7) -> AudioBuffer {
+    public static func sweepingLowPass(_ buffer: Waveform, from startCutoff: Float,
+                                       to endCutoff: Float, resonance: Float = 0.7) -> Waveform {
         var out = buffer
         guard buffer.count > 0 else { return out }
         let q = 1 / MathUtil.clamp(resonance, 0.5, 10)
@@ -169,7 +169,7 @@ public enum Synth {
     /// Soft saturation. A gunshot that is simply scaled up clips into buzz; driven through
     /// a tanh it gets louder and thicker instead, which is what a limiter on a real
     /// recording does.
-    public static func saturate(_ buffer: AudioBuffer, drive: Float = 3) -> AudioBuffer {
+    public static func saturate(_ buffer: Waveform, drive: Float = 3) -> Waveform {
         var out = buffer
         let normalise = tanh(drive)
         for index in out.samples.indices {
@@ -180,8 +180,8 @@ public enum Synth {
 
     /// A feedback delay. Used as a stand-in for a room: three of these at prime-ish spacings
     /// read as reflections, which is all a gunshot tail needs.
-    public static func delay(_ buffer: AudioBuffer, seconds: Float, feedback: Float,
-                             mix: Float, tailSeconds: Float = 0) -> AudioBuffer {
+    public static func delay(_ buffer: Waveform, seconds: Float, feedback: Float,
+                             mix: Float, tailSeconds: Float = 0) -> Waveform {
         var out = buffer.padded(toSeconds: buffer.duration + tailSeconds)
         let step = Swift.max(1, Int(seconds * buffer.sampleRate))
         guard step < out.count else { return buffer }
@@ -205,18 +205,18 @@ public enum Synth {
     /// trims what is left: sized generously, a large room rings into ten seconds of buffer
     /// to produce one second of audible tail, and every one of those samples costs memory
     /// in the voice pool and time in the mixer.
-    public static func room(_ buffer: AudioBuffer, size: Float, decay: Float,
-                            mix: Float = 0.4) -> AudioBuffer {
+    public static func room(_ buffer: Waveform, size: Float, decay: Float,
+                            mix: Float = 0.4) -> Waveform {
         let total = buffer.duration + size * 1.2
         let dry = buffer.padded(toSeconds: total)
-        var wet = AudioBuffer(sampleRate: buffer.sampleRate, count: dry.count)
+        var wet = Waveform(sampleRate: buffer.sampleRate, count: dry.count)
         let feedback = MathUtil.clamp(decay, 0, 0.92)
         let spacings: [Float] = [0.0297, 0.0371, 0.0411, 0.0437]
 
         for spacing in spacings {
             let step = Swift.max(1, Int(spacing * size * buffer.sampleRate))
             guard step < dry.count else { continue }
-            var line = AudioBuffer(sampleRate: buffer.sampleRate, count: dry.count)
+            var line = Waveform(sampleRate: buffer.sampleRate, count: dry.count)
             for index in step..<line.count {
                 line.samples[index] = (dry.samples[index - step]
                                        + line.samples[index - step]) * feedback

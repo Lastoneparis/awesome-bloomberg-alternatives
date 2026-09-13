@@ -14,7 +14,7 @@ public enum SoundBank {
 
     /// Resolves a sound name. Returns nil for a name with no recipe, which the caller
     /// treats exactly as it treats a missing file: silence, no crash.
-    public static func sound(named name: String) -> AudioBuffer? {
+    public static func sound(named name: String) -> Waveform? {
         if let weaponSound = weaponSound(named: name) { return weaponSound }
         if name.hasPrefix("sfx_step_") {
             return footstep(surface: surface(from: String(name.dropFirst("sfx_step_".count))),
@@ -97,7 +97,7 @@ public enum SoundBank {
 
     // MARK: - Weapons
 
-    private static func weaponSound(named name: String) -> AudioBuffer? {
+    private static func weaponSound(named name: String) -> Waveform? {
         guard name.hasPrefix("sfx_") else { return nil }
         let body = String(name.dropFirst(4))
         if body.hasSuffix("_fire") {
@@ -117,7 +117,7 @@ public enum SoundBank {
     /// A gunshot is four layers, and leaving any one out is immediately audible: the crack
     /// of the muzzle blast, the body of the expanding gas, a low thump you feel more than
     /// hear, and the room reflecting it back.
-    public static func gunshot(for weapon: WeaponData) -> AudioBuffer {
+    public static func gunshot(for weapon: WeaponData) -> Waveform {
         let seed = hash(weapon.id.value)
         if weapon.weaponClass == .melee { return melee(seed: seed) }
 
@@ -184,7 +184,7 @@ public enum SoundBank {
             .sanitized()
     }
 
-    public static func melee(seed: UInt64) -> AudioBuffer {
+    public static func melee(seed: UInt64) -> Waveform {
         // A knife swing is air, not impact: a band of noise rushing past.
         let swing = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.22, seed: seed), mode: .bandPass,
@@ -195,8 +195,8 @@ public enum SoundBank {
 
     /// Reload: two or three mechanical events spaced out, rather than one noise. The
     /// spacing is what makes it read as a magazine coming out and another going in.
-    public static func reload(weight: Float, shells: Bool, seed: UInt64) -> AudioBuffer {
-        var out = AudioBuffer(seconds: shells ? 0.8 : 1.05)
+    public static func reload(weight: Float, shells: Bool, seed: UInt64) -> Waveform {
+        var out = Waveform(seconds: shells ? 0.8 : 1.05)
         let pitch = MathUtil.clamp(1.4 / max(0.4, weight), 0.6, 1.8)
 
         func clack(at time: Float, cutoff: Float, decay: Float, gain: Float, seed: UInt64) {
@@ -225,7 +225,7 @@ public enum SoundBank {
         return out.normalized(to: 0.62).faded().sanitized()
     }
 
-    public static func dryFire() -> AudioBuffer {
+    public static func dryFire() -> Waveform {
         let click = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.06, seed: 0xDF1), mode: .bandPass,
                          cutoff: 3400, resonance: 4),
@@ -237,8 +237,8 @@ public enum SoundBank {
 
     /// Footsteps carry more competitive information than anything else in the mix, so each
     /// surface has to be distinguishable in a quarter of a second, through gunfire.
-    public static func footstep(surface: SurfaceKind, seed: UInt64) -> AudioBuffer {
-        let step: AudioBuffer
+    public static func footstep(surface: SurfaceKind, seed: UInt64) -> Waveform {
+        let step: Waveform
         switch surface {
         case .metal:
             // A struck panel: a band of noise plus a ringing partial.
@@ -301,7 +301,7 @@ public enum SoundBank {
     }
 
     /// A round hitting a wall: the same materials, harder and shorter.
-    public static func impact(surface: SurfaceKind, seed: UInt64) -> AudioBuffer {
+    public static func impact(surface: SurfaceKind, seed: UInt64) -> Waveform {
         var hit = footstep(surface: surface, seed: seed &+ 101)
         hit = Synth.envelope(hit, attack: 0.0003, decay: 0.09, curve: 4)
         // The spall: grit thrown off the surface, always there and always brief.
@@ -317,7 +317,7 @@ public enum SoundBank {
 
     /// The hit marker is the most repeated sound in the game — thousands of times a
     /// session — so it has to be short, bright, and completely unlike anything else.
-    public static func hitMarker(headshot: Bool) -> AudioBuffer {
+    public static func hitMarker(headshot: Bool) -> Waveform {
         let base: Float = headshot ? 1760 : 1180
         var tick = Synth.envelope(Synth.tone(frequency: base, seconds: 0.07),
                                   attack: 0.0006, decay: 0.05, curve: 4)
@@ -332,8 +332,8 @@ public enum SoundBank {
         return tick.normalized(to: headshot ? 0.6 : 0.45).faded().sanitized()
     }
 
-    public static func killConfirm(headshot: Bool = false) -> AudioBuffer {
-        var chime = AudioBuffer(seconds: headshot ? 0.55 : 0.42)
+    public static func killConfirm(headshot: Bool = false) -> Waveform {
+        var chime = Waveform(seconds: headshot ? 0.55 : 0.42)
         let notes: [Float] = headshot ? [784, 1046, 1318, 1568] : [784, 1046, 1318]
         for (index, frequency) in notes.enumerated() {
             chime.mix(Synth.envelope(Synth.tone(frequency: frequency, seconds: 0.3),
@@ -346,8 +346,8 @@ public enum SoundBank {
     /// An arpeggiated chord, which is what almost every positive announcement in a shooter
     /// is underneath. `intervals` are semitones above the root.
     public static func fanfare(intervals: [Float], seconds: Float, bright: Bool,
-                               transpose: Float = 0) -> AudioBuffer {
-        var out = AudioBuffer(seconds: seconds + 0.25)
+                               transpose: Float = 0) -> Waveform {
+        var out = Waveform(seconds: seconds + 0.25)
         let root: Float = (bright ? 523.25 : 392) * pow(2, transpose / 12)
         let step = seconds / Float(max(1, intervals.count)) * 0.55
         for (index, interval) in intervals.enumerated() {
@@ -364,8 +364,8 @@ public enum SoundBank {
     }
 
     /// A repeating electronic beep — a planted bomb, a ping on the map.
-    public static func beacon(frequency: Float, beeps: Int, spacing: Float) -> AudioBuffer {
-        var out = AudioBuffer(seconds: spacing * Float(beeps) + 0.2)
+    public static func beacon(frequency: Float, beeps: Int, spacing: Float) -> Waveform {
+        var out = Waveform(seconds: spacing * Float(beeps) + 0.2)
         for index in 0..<max(1, beeps) {
             var beep = Synth.envelope(Synth.tone(frequency: frequency, seconds: 0.12),
                                       attack: 0.002, hold: 0.03, decay: 0.08, curve: 2.5)
@@ -378,7 +378,7 @@ public enum SoundBank {
 
     /// Taking a hit: a short dull thud with a band of noise, deliberately unpleasant and
     /// deliberately nothing like the hit marker, which means the opposite thing.
-    public static func takeDamage() -> AudioBuffer {
+    public static func takeDamage() -> Waveform {
         var out = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.22, seed: 0xDA11), mode: .bandPass,
                          cutoff: 380, resonance: 1.8),
@@ -388,8 +388,8 @@ public enum SoundBank {
         return out.normalized(to: 0.55).faded().sanitized()
     }
 
-    public static func weaponSwap() -> AudioBuffer {
-        var out = AudioBuffer(seconds: 0.4)
+    public static func weaponSwap() -> Waveform {
+        var out = Waveform(seconds: 0.4)
         out.mix(Synth.envelope(Synth.filter(Synth.noise(seconds: 0.1, seed: 0x5AA1),
                                             mode: .bandPass, cutoff: 2200, resonance: 3),
                                attack: 0.0006, decay: 0.06, curve: 3.5), at: 0, gain: 0.7)
@@ -399,7 +399,7 @@ public enum SoundBank {
         return out.normalized(to: 0.45).trimmedSilence().faded().sanitized()
     }
 
-    public static func grenadeThrow() -> AudioBuffer {
+    public static func grenadeThrow() -> Waveform {
         // Cloth and air, not metal: the pin and the arm, not the impact.
         let out = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.26, seed: 0x67A1), mode: .bandPass,
@@ -410,14 +410,14 @@ public enum SoundBank {
 
     /// The ring after a flashbang, played dry in the player's own ears rather than in the
     /// world. Long, and the only sound in the game allowed to be annoying.
-    public static func flashRing() -> AudioBuffer {
+    public static func flashRing() -> Waveform {
         var out = Synth.decay(Synth.tone(frequency: 4300, seconds: 4.5), halfLife: 1.3)
         out.mix(Synth.decay(Synth.tone(frequency: 6450, seconds: 3.5), halfLife: 0.9), gain: 0.4)
         out.mix(Synth.decay(Synth.tone(frequency: 2870, seconds: 3.0), halfLife: 0.7), gain: 0.2)
         return out.normalized(to: 0.5).faded(inSeconds: 0.02, outSeconds: 0.8).sanitized()
     }
 
-    public static func crateOpen() -> AudioBuffer {
+    public static func crateOpen() -> Waveform {
         // A rising sweep into a chord: the sound of something being revealed.
         var out = Synth.envelope(
             Synth.filter(Synth.sweep(from: 200, to: 2400, seconds: 0.6, wave: .sawtooth,
@@ -427,7 +427,7 @@ public enum SoundBank {
         return out.normalized(to: 0.5).trimmedSilence().faded().sanitized()
     }
 
-    public static func errorBuzz() -> AudioBuffer {
+    public static func errorBuzz() -> Waveform {
         var out = Synth.envelope(Synth.tone(frequency: 160, seconds: 0.16, wave: .square),
                                  attack: 0.002, decay: 0.12, curve: 2)
         out.mix(Synth.envelope(Synth.tone(frequency: 240, seconds: 0.14, wave: .square),
@@ -435,7 +435,7 @@ public enum SoundBank {
         return out.normalized(to: 0.35).faded().sanitized()
     }
 
-    public static func death() -> AudioBuffer {
+    public static func death() -> Waveform {
         // Falling, dull, and long enough to register as final.
         var out = Synth.envelope(
             Synth.sweep(from: 320, to: 70, seconds: 0.9, wave: .triangle, curve: 2),
@@ -446,7 +446,7 @@ public enum SoundBank {
         return out.normalized(to: 0.6).faded().sanitized()
     }
 
-    public static func explosion(seed: UInt64) -> AudioBuffer {
+    public static func explosion(seed: UInt64) -> Waveform {
         // Low sweep for the pressure wave, wide noise for the blast, a long dulling tail.
         // Same rule as the gunshot: keep the pressure wave in the low mids, where a phone
         // can actually reproduce it, rather than at a sub frequency that only shows up on
@@ -469,7 +469,7 @@ public enum SoundBank {
             .faded(inSeconds: 0.0004, outSeconds: 0.15).sanitized()
     }
 
-    public static func flashbang() -> AudioBuffer {
+    public static func flashbang() -> Waveform {
         var out = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.5, seed: 0xF1A5), mode: .highPass, cutoff: 1800),
             attack: 0.0004, decay: 0.35, curve: 3)
@@ -481,7 +481,7 @@ public enum SoundBank {
         return out.normalized(to: 0.8).faded(inSeconds: 0.0004, outSeconds: 0.4).sanitized()
     }
 
-    public static func smoke(seed: UInt64) -> AudioBuffer {
+    public static func smoke(seed: UInt64) -> Waveform {
         let hiss = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 2.4, seed: seed), mode: .bandPass,
                          cutoff: 5200, resonance: 0.8),
@@ -489,7 +489,7 @@ public enum SoundBank {
         return hiss.normalized(to: 0.4).faded(inSeconds: 0.02, outSeconds: 0.2).sanitized()
     }
 
-    public static func fireLoop(seed: UInt64) -> AudioBuffer {
+    public static func fireLoop(seed: UInt64) -> Waveform {
         var fire = Synth.filter(Synth.noise(seconds: 3, seed: seed), mode: .lowPass,
                                 cutoff: 1100, resonance: 0.8).gained(0.5)
         // Crackle: short bright transients scattered through the bed.
@@ -504,7 +504,7 @@ public enum SoundBank {
         return fire.loopable(crossfadeSeconds: 0.4).normalized(to: 0.5).sanitized()
     }
 
-    public static func grenadeBounce(seed: UInt64) -> AudioBuffer {
+    public static func grenadeBounce(seed: UInt64) -> Waveform {
         var bounce = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.12, seed: seed), mode: .bandPass,
                          cutoff: 2800, resonance: 3.5),
@@ -514,8 +514,8 @@ public enum SoundBank {
         return bounce.normalized(to: 0.45).faded().sanitized()
     }
 
-    public static func pickup() -> AudioBuffer {
-        var out = AudioBuffer(seconds: 0.26)
+    public static func pickup() -> Waveform {
+        var out = Waveform(seconds: 0.26)
         out.mix(Synth.envelope(Synth.tone(frequency: 880, seconds: 0.12),
                                attack: 0.002, decay: 0.09, curve: 3), gain: 0.5)
         out.mix(Synth.envelope(Synth.tone(frequency: 1320, seconds: 0.14),
@@ -523,7 +523,7 @@ public enum SoundBank {
         return out.normalized(to: 0.45).faded().sanitized()
     }
 
-    public static func jump() -> AudioBuffer {
+    public static func jump() -> Waveform {
         let out = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.12, seed: 0x7411), mode: .bandPass,
                          cutoff: 1100, resonance: 1.4),
@@ -531,7 +531,7 @@ public enum SoundBank {
         return out.normalized(to: 0.32).faded().sanitized()
     }
 
-    public static func land(seed: UInt64) -> AudioBuffer {
+    public static func land(seed: UInt64) -> Waveform {
         var out = Synth.envelope(
             Synth.filter(Synth.noise(seconds: 0.22, seed: seed), mode: .lowPass,
                          cutoff: 900, resonance: 1.2),
@@ -541,13 +541,13 @@ public enum SoundBank {
         return out.normalized(to: 0.5).faded().sanitized()
     }
 
-    public static func uiClick() -> AudioBuffer {
+    public static func uiClick() -> Waveform {
         let out = Synth.envelope(Synth.tone(frequency: 1500, seconds: 0.04),
                                  attack: 0.001, decay: 0.03, curve: 3)
         return out.normalized(to: 0.3).faded().sanitized()
     }
 
-    public static func uiBack() -> AudioBuffer {
+    public static func uiBack() -> Waveform {
         let out = Synth.envelope(Synth.tone(frequency: 700, seconds: 0.05),
                                  attack: 0.001, decay: 0.04, curve: 3)
         return out.normalized(to: 0.3).faded().sanitized()
@@ -557,10 +557,10 @@ public enum SoundBank {
 
     /// Ambience is a bed, not an event: it has to loop for a whole match without anyone
     /// noticing the seam or getting tired of it.
-    public static func ambience(named name: String) -> AudioBuffer {
+    public static func ambience(named name: String) -> Waveform {
         let seed = hash(name)
         let seconds: Float = 8
-        var bed: AudioBuffer
+        var bed: Waveform
 
         switch name {
         case "amb_desert_wind", "amb_wind", "amb_blizzard":
@@ -625,7 +625,7 @@ public enum SoundBank {
     /// Menu and match music: a tension bed rather than a tune. A generated melody would be
     /// worse than none, and in a competitive shooter the music has to stay under the
     /// footsteps anyway.
-    public static func music(named name: String) -> AudioBuffer {
+    public static func music(named name: String) -> Waveform {
         let seed = hash(name)
         let bpm: Float = name == "mus_menu" ? 84 : 96
         let beat = 60 / bpm
@@ -645,7 +645,7 @@ public enum SoundBank {
         default: root = 103.8                // G#2
         }
 
-        var track = AudioBuffer(seconds: seconds)
+        var track = Waveform(seconds: seconds)
         // Drone: root and fifth, detuned slightly so they beat against each other.
         for (ratio, gain) in [(1.0, 0.5), (1.5, 0.22), (2.0, 0.16), (1.003, 0.2)] {
             track.mix(Synth.tone(frequency: root * Float(ratio), seconds: seconds,
@@ -678,7 +678,7 @@ public enum SoundBank {
 
     /// End of match. Major and rising, or minor and falling — the two most legible
     /// musical gestures there are, and the screen behind them says the rest.
-    public static func victorySting(won: Bool) -> AudioBuffer {
+    public static func victorySting(won: Bool) -> Waveform {
         let intervals: [Float] = won ? [0, 4, 7, 12] : [0, -3, -8, -12]
         var out = fanfare(intervals: intervals, seconds: 1.6, bright: won, transpose: won ? 0 : -5)
         // A pad underneath, so it reads as music rather than as another announcement.

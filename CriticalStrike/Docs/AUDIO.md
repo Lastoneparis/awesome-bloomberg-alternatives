@@ -16,7 +16,7 @@ Synth (core, Foundation only, unit-tested)
    oscillators · noise · sweeps · envelopes · state-variable filter · saturation · room
         │
         ▼
-AudioBuffer — mono float samples, with mixing, normalising, fading, looping, resampling
+Waveform — mono float samples, with mixing, normalising, fading, looping, resampling
         │
         ▼
 SoundBank — one recipe per sound, resolved by the name the game already asks for

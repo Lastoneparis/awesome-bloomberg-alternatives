@@ -64,6 +64,29 @@ def strip_noise(text):
         i += 1
     return ''.join(out)
 
+# Type names that already exist in the frameworks the app imports. A public type in the
+# core with one of these names shadows the framework's, but only in files that import both
+# — so the core compiles happily and the app and test targets do not. It has happened
+# twice: `Timer` (Foundation) broke the test target, and `AudioBuffer` (CoreAudioTypes, via
+# AVFoundation) made the type unnameable in the audio bridge. Both are now Countdown and
+# Waveform.
+FRAMEWORK_TYPE_NAMES = {
+    # Foundation
+    "Timer", "Notification", "NotificationCenter", "Operation", "OperationQueue",
+    "Progress", "Bundle", "Process", "Pipe", "Stream", "Scanner", "Formatter", "Thread",
+    "Port", "Host", "Measurement", "Unit", "FileHandle", "FileManager", "UserDefaults",
+    "DateComponents", "DateInterval", "IndexPath", "IndexSet", "CharacterSet",
+    # CoreAudioTypes, reachable through AVFoundation
+    "AudioBuffer", "AudioBufferList", "AudioTimeStamp", "AudioChannelLayout",
+    "AudioStreamBasicDescription", "AudioQueueBuffer",
+    # StoreKit
+    "Product", "Transaction", "Storefront", "AppStore",
+    # Swift concurrency and standard library
+    "Task", "TaskGroup", "Clock", "Duration", "Instant", "Result", "Mirror",
+    # Dispatch
+    "DispatchQueue", "DispatchGroup", "DispatchTime",
+}
+
 def swift_files():
     for base in SOURCE_DIRS:
         for dirpath, _, filenames in os.walk(base):
@@ -118,6 +141,10 @@ def main():
                 warnings.append(f"{rel}:{lineno}: line longer than 130 characters")
 
     for name, places in sorted(declarations.items()):
+        if name in FRAMEWORK_TYPE_NAMES:
+            errors.append(f"{places[0]}: '{name}' is also a framework type; it will shadow "
+                          "the framework's in any file that imports both. Rename it.")
+
         if len(places) > 1:
             errors.append(f"duplicate declaration of '{name}': " + ", ".join(places))
 

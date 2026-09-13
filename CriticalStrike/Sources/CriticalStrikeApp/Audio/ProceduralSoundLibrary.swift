@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import CriticalStrikeCore
 
-/// Turns the core's synthesised `AudioBuffer`s into the `AVAudioPCMBuffer`s the engine
+/// Turns the core's synthesised `Waveform`s into the `AVAudioPCMBuffer`s the engine
 /// schedules, and caches them.
 ///
 /// This is the audio counterpart of `TextureLibrary`: generation is deterministic, so it
@@ -48,7 +48,7 @@ final class ProceduralSoundLibrary: @unchecked Sendable {
     /// Mono float PCM at the engine's rate — mono because the environment node will only
     /// spatialise a mono source, and a gunshot that does not come from a direction is
     /// worse than no gunshot at all.
-    private static func pcm(from buffer: AudioBuffer, at sampleRate: Double) -> AVAudioPCMBuffer? {
+    private static func pcm(from buffer: Waveform, at sampleRate: Double) -> AVAudioPCMBuffer? {
         let resampled = buffer.resampled(to: Float(sampleRate))
         guard !resampled.isEmpty,
               let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),

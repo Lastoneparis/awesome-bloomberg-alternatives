@@ -5,38 +5,38 @@ import XCTest
 /// are actually wrong when a recipe is wrong — silence, a filter blowing up, a NaN reaching
 /// the audio unit, a sound ten times longer than it needs to be, a sniper that is brighter
 /// than an SMG.
-final class AudioBufferTests: XCTestCase {
+final class WaveformTests: XCTestCase {
 
     func testDurationFollowsSampleRate() {
-        XCTAssertEqual(AudioBuffer(seconds: 0.5).count, 22_050)
-        XCTAssertEqual(AudioBuffer(seconds: 0.5).duration, 0.5, accuracy: 1e-4)
-        XCTAssertEqual(AudioBuffer(sampleRate: 48_000, seconds: 1).count, 48_000)
+        XCTAssertEqual(Waveform(seconds: 0.5).count, 22_050)
+        XCTAssertEqual(Waveform(seconds: 0.5).duration, 0.5, accuracy: 1e-4)
+        XCTAssertEqual(Waveform(sampleRate: 48_000, seconds: 1).count, 48_000)
     }
 
     func testMixGrowsTheBufferAndAddsAtTheOffset() {
-        var base = AudioBuffer(seconds: 0.1)
-        let blip = AudioBuffer(samples: [1, 1, 1])
+        var base = Waveform(seconds: 0.1)
+        let blip = Waveform(samples: [1, 1, 1])
         base.mix(blip, at: 0.05, gain: 0.5)
-        let offset = Int(0.05 * AudioBuffer.defaultSampleRate)
+        let offset = Int(0.05 * Waveform.defaultSampleRate)
         XCTAssertEqual(base.samples[offset], 0.5, accuracy: 1e-6)
         XCTAssertEqual(base.samples[offset - 1], 0, accuracy: 1e-6)
 
-        var short = AudioBuffer(samples: [1, 1])
-        short.mix(AudioBuffer(samples: [2, 2, 2, 2]))
+        var short = Waveform(samples: [1, 1])
+        short.mix(Waveform(samples: [2, 2, 2, 2]))
         XCTAssertEqual(short.count, 4, "mixing past the end must grow the buffer")
         XCTAssertEqual(short.samples, [3, 3, 2, 2])
     }
 
     func testNormalizedHitsTheTargetPeak() {
-        let quiet = AudioBuffer(samples: [0.01, -0.02, 0.015])
+        let quiet = Waveform(samples: [0.01, -0.02, 0.015])
         XCTAssertEqual(quiet.normalized(to: 0.9).peak, 0.9, accuracy: 1e-5)
         // Silence has no peak to scale to, and dividing by it would produce infinities.
-        let silent = AudioBuffer(samples: [0, 0, 0])
+        let silent = Waveform(samples: [0, 0, 0])
         XCTAssertEqual(silent.normalized().samples, [0, 0, 0])
     }
 
     func testFadeRemovesTheEdgeDiscontinuity() {
-        let square = AudioBuffer(samples: [Float](repeating: 1, count: 4410))
+        let square = Waveform(samples: [Float](repeating: 1, count: 4410))
         let faded = square.faded(inSeconds: 0.005, outSeconds: 0.005)
         XCTAssertEqual(faded.samples.first!, 0, accuracy: 1e-6)
         XCTAssertEqual(faded.samples.last!, 0, accuracy: 1e-6)
@@ -44,22 +44,22 @@ final class AudioBufferTests: XCTestCase {
     }
 
     func testTrimmedSilenceCutsTheTailButKeepsTheSound() {
-        var buffer = AudioBuffer(seconds: 2)
+        var buffer = Waveform(seconds: 2)
         for index in 0..<1000 { buffer.samples[index] = 0.5 }
         let trimmed = buffer.trimmedSilence(releaseSeconds: 0.05)
         XCTAssertLessThan(trimmed.duration, 0.1)
-        XCTAssertGreaterThan(trimmed.duration, 1000 / AudioBuffer.defaultSampleRate)
+        XCTAssertGreaterThan(trimmed.duration, 1000 / Waveform.defaultSampleRate)
         XCTAssertEqual(trimmed.samples[500], 0.5, accuracy: 1e-6)
     }
 
     func testTrimmedSilenceLeavesAFullyQuietBufferAlone() {
-        let silent = AudioBuffer(seconds: 0.5)
+        let silent = Waveform(seconds: 0.5)
         XCTAssertEqual(silent.trimmedSilence().count, silent.count)
     }
 
     func testLoopableJoinsHeadToTail() {
         // A bed that steps from -1 to +1 at the seam would click on every repeat.
-        var buffer = AudioBuffer(seconds: 1)
+        var buffer = Waveform(seconds: 1)
         for index in buffer.samples.indices {
             buffer.samples[index] = index < buffer.count / 2 ? -1 : 1
         }
@@ -83,11 +83,11 @@ final class AudioBufferTests: XCTestCase {
 
     func testResamplingToTheSameRateIsFree() {
         let source = Synth.tone(frequency: 440, seconds: 0.05)
-        XCTAssertEqual(source.resampled(to: AudioBuffer.defaultSampleRate).samples, source.samples)
+        XCTAssertEqual(source.resampled(to: Waveform.defaultSampleRate).samples, source.samples)
     }
 
     func testSanitizedReplacesNonFiniteSamples() {
-        let broken = AudioBuffer(samples: [0.5, .nan, .infinity, -.infinity, 4])
+        let broken = Waveform(samples: [0.5, .nan, .infinity, -.infinity, 4])
         let clean = broken.sanitized()
         XCTAssertEqual(clean.samples, [0.5, 0, 0, 0, 1])
         for sample in clean.samples { XCTAssertTrue(sample.isFinite) }
@@ -98,7 +98,7 @@ final class SynthTests: XCTestCase {
 
     /// Energy above and below a frequency, by counting zero crossings and by a crude
     /// band measurement — enough to tell a dull sound from a bright one.
-    private func zeroCrossingRate(_ buffer: AudioBuffer) -> Float {
+    private func zeroCrossingRate(_ buffer: Waveform) -> Float {
         guard buffer.count > 1 else { return 0 }
         var crossings = 0
         for index in 1..<buffer.count where (buffer.samples[index] < 0) != (buffer.samples[index - 1] < 0) {
@@ -156,17 +156,17 @@ final class SynthTests: XCTestCase {
     }
 
     func testEnvelopeRisesThenFalls() {
-        let flat = AudioBuffer(samples: [Float](repeating: 1, count: 4410))
+        let flat = Waveform(samples: [Float](repeating: 1, count: 4410))
         let shaped = Synth.envelope(flat, attack: 0.01, hold: 0.01, decay: 0.05)
         XCTAssertEqual(shaped.samples[0], 0, accuracy: 1e-6)
-        let attackEnd = Int(0.01 * AudioBuffer.defaultSampleRate)
+        let attackEnd = Int(0.01 * Waveform.defaultSampleRate)
         XCTAssertEqual(shaped.samples[attackEnd + 100], 1, accuracy: 1e-6, "hold must be flat")
         XCTAssertLessThan(shaped.samples[shaped.count - 1], 0.05)
         XCTAssertLessThanOrEqual(shaped.peak, 1)
     }
 
     func testDecayHalvesAtTheHalfLife() {
-        let flat = AudioBuffer(samples: [Float](repeating: 1, count: 44_100))
+        let flat = Waveform(samples: [Float](repeating: 1, count: 44_100))
         let decayed = Synth.decay(flat, halfLife: 0.1)
         XCTAssertEqual(decayed.samples[4410], 0.5, accuracy: 0.01)
         XCTAssertEqual(decayed.samples[8820], 0.25, accuracy: 0.01)
@@ -182,7 +182,7 @@ final class SynthTests: XCTestCase {
     func testRoomKeepsTheDirectSoundLoudest() {
         // Four cascaded in-place delays used to pile reflections up until the loudest
         // moment of a gunshot was fifty milliseconds after the trigger.
-        var impulse = AudioBuffer(seconds: 0.05)
+        var impulse = Waveform(seconds: 0.05)
         impulse.samples[0] = 1
         let wet = Synth.room(impulse, size: 2, decay: 0.6, mix: 0.4)
         let peakIndex = wet.samples.indices.max { abs(wet.samples[$0]) < abs(wet.samples[$1]) }
@@ -196,9 +196,9 @@ final class SynthTests: XCTestCase {
 /// that mentions it. In a debug build that is the difference between a fast suite and a
 /// slow one.
 private enum Bank {
-    private static var cache: [String: AudioBuffer?] = [:]
+    private static var cache: [String: Waveform?] = [:]
 
-    static func sound(_ name: String) -> AudioBuffer? {
+    static func sound(_ name: String) -> Waveform? {
         if let cached = cache[name] { return cached }
         let sound = SoundBank.sound(named: name)
         cache[name] = sound
@@ -208,7 +208,7 @@ private enum Bank {
 
 final class SoundBankTests: XCTestCase {
 
-    private func centroid(_ buffer: AudioBuffer) -> Float {
+    private func centroid(_ buffer: Waveform) -> Float {
         // Crude spectral centroid via zero-crossing rate: exact enough to order sounds
         // from dull to bright, which is all these assertions need.
         guard buffer.count > 1 else { return 0 }
