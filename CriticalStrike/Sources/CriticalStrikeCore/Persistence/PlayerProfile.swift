@@ -32,8 +32,8 @@ public struct PlayerProfile: Codable, Equatable, Sendable {
 
     public var entitlements: Entitlements
     public var settings: GameSettings
-    public var friendCodes: [String]
-    public var clanTag: String?
+    public var friends: [Friend]
+    public var clan: Clan?
     public var hasSeenTutorial: Bool
     public var dailyRewardStreak: Int
     public var lastDailyRewardAt: Date?
@@ -58,7 +58,7 @@ public struct PlayerProfile: Codable, Equatable, Sendable {
         lootPity = [:]
         entitlements = Entitlements()
         settings = GameSettings()
-        friendCodes = []
+        friends = []
         hasSeenTutorial = false
         dailyRewardStreak = 0
     }
@@ -72,6 +72,12 @@ public struct PlayerProfile: Codable, Equatable, Sendable {
     public var rank: CompetitiveRank { CompetitiveRank.rank(forRating: competitiveRating) }
     public var rankDivision: Int { CompetitiveRank.division(forRating: competitiveRating) }
     public var isPremium: Bool { entitlements.hasActiveVIP }
+    public var friendCode: String { FriendCode.make(from: accountID) }
+    /// The name shown to other players, including the clan tag when they are in one.
+    public var taggedName: String {
+        guard let tag = clan?.tag, !tag.isEmpty else { return displayName }
+        return "[\(tag)] \(displayName)"
+    }
     public var selectedLoadout: Loadout {
         loadouts.indices.contains(selectedLoadoutIndex)
             ? loadouts[selectedLoadoutIndex] : Loadout.starter()
@@ -158,7 +164,8 @@ public struct PlayerProfile: Codable, Equatable, Sendable {
         let passXP = MatchPayout.battlePassXP(matchDurationSeconds: durationSeconds,
                                               won: won, isPremium: premium)
 
-        let levelsGained = awardXP(xp)
+        let clanBonus = clan?.xpBonus ?? 1
+        let levelsGained = awardXP(Int(Float(xp) * clanBonus))
         wallet.credit(coins, .coins)
         awardBattlePassXP(passXP)
         stats.record(result: result, mode: mode.kind, won: won, durationSeconds: durationSeconds,
@@ -171,7 +178,7 @@ public struct PlayerProfile: Codable, Equatable, Sendable {
         }
         lastPlayedAt = Date()
 
-        return MatchRewards(xp: xp, coins: coins, battlePassXP: passXP,
+        return MatchRewards(xp: Int(Float(xp) * clanBonus), coins: coins, battlePassXP: passXP,
                             levelsGained: levelsGained, newAttachments: newAttachments)
     }
 

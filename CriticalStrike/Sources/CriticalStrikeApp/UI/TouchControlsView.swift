@@ -12,12 +12,15 @@ struct TouchControlsView: View {
     /// without this the pressed states would never redraw.
     @ObservedObject var controls: TouchControls
     let size: CGSize
+    /// Opening the ping wheel is the parent's job, since the wheel covers the whole screen.
+    let onPingRequested: () -> Void
     @EnvironmentObject private var app: AppState
 
-    init(session: GameSession, size: CGSize) {
+    init(session: GameSession, size: CGSize, onPingRequested: @escaping () -> Void) {
         self.session = session
         self.controls = session.controls
         self.size = size
+        self.onPingRequested = onPingRequested
     }
 
     private var settings: GameSettings { app.profile.settings }
@@ -147,7 +150,7 @@ struct TouchControlsView: View {
             // Scoreboard (hold) and ping.
             actionButton("pingButton", systemImage: "mappin.and.ellipse", size: 42,
                          tint: Theme.textPrimary, held: false) { pressed in
-                if pressed { session.sendPing(kind: .enemy) }
+                if pressed { onPingRequested() }
             }
             scoreboardButton
             if session.mode.usesBuyMenu && hud.phase == .freezeTime {

@@ -71,6 +71,10 @@ This file is the checklist the build loop works through. Anything unchecked is n
 - [x] Network transport (WebSocket client, LAN host via Network.framework)
 - [x] Game session glue (sim + render + input + net)
 
+## Phase 9.5 — Social
+- [x] Clans (tag, weekly level, capped XP bonus), friend codes, friends list
+- [x] In-match ping wheel
+
 ## Phase 9 — Project & docs
 - [x] XcodeGen project.yml, Info.plist, entitlements, StoreKit config
 - [x] Unit tests for core systems

@@ -70,6 +70,8 @@ struct RootView: View {
                 ProfileView()
             case .leaderboard:
                 LeaderboardView()
+            case .social:
+                SocialView()
             case .settings:
                 SettingsView()
             case .hudEditor:

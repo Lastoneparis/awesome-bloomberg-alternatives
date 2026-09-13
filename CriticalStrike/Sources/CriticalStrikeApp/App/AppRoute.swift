@@ -18,6 +18,7 @@ enum AppRoute: Equatable, Hashable {
     case missions
     case profile
     case leaderboard
+    case social
     case settings
     case hudEditor
 
@@ -46,6 +47,7 @@ enum AppRoute: Equatable, Hashable {
         case .missions: return "Missions"
         case .profile: return "Profile"
         case .leaderboard: return "Leaderboards"
+        case .social: return "Social"
         case .settings: return "Settings"
         case .hudEditor: return "Customise HUD"
         }

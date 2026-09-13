@@ -92,6 +92,7 @@ struct MainMenuView: View {
             menuButton("Missions", icon: "checklist", route: .missions,
                        badge: app.missionTracker.claimable().count)
             menuButton("Leaderboards", icon: "trophy.fill", route: .leaderboard)
+            menuButton("Social", icon: "person.3.fill", route: .social)
             menuButton("Settings", icon: "gearshape.fill", route: .settings)
 
             Spacer()

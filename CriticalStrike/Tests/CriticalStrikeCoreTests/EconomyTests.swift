@@ -462,3 +462,56 @@ final class ContentIntegrityTests: XCTestCase {
         }
     }
 }
+
+final class SocialTests: XCTestCase {
+    func testFriendCodesAreStableAndReadable() {
+        let account = "8B1C-DEADBEEF"
+        let code = FriendCode.make(from: account)
+        XCTAssertEqual(code, FriendCode.make(from: account), "Friend codes are not stable")
+        XCTAssertTrue(FriendCode.isValid(code))
+        XCTAssertEqual(code.count, 9, "Expected XXXX-XXXX")
+        // The alphabet excludes characters that are ambiguous when read aloud.
+        XCTAssertFalse(code.contains("O"))
+        XCTAssertFalse(code.contains("0"))
+        XCTAssertFalse(code.contains("I"))
+        XCTAssertFalse(code.contains("1"))
+    }
+
+    func testDifferentAccountsGetDifferentCodes() {
+        var seen = Set<String>()
+        for index in 0..<500 {
+            seen.insert(FriendCode.make(from: "account-\(index)"))
+        }
+        XCTAssertGreaterThan(seen.count, 490, "Friend codes collide too often")
+    }
+
+    func testFriendCodeNormalisation() {
+        let code = FriendCode.make(from: "abc")
+        let stripped = code.replacingOccurrences(of: "-", with: "").lowercased()
+        XCTAssertEqual(FriendCode.normalize(stripped), code)
+        XCTAssertFalse(FriendCode.isValid("NOPE"))
+    }
+
+    func testClanTagsAreNormalised() {
+        XCTAssertEqual(Clan.normalize(tag: "a-b c!de"), "ABCD")
+        XCTAssertTrue(Clan.isValid(tag: "cs"))
+        XCTAssertFalse(Clan.isValid(tag: "x"))
+        XCTAssertFalse(Clan.isValid(name: "no"))
+        XCTAssertTrue(Clan.isValid(name: "Strike Force"))
+    }
+
+    func testClanBonusIsCappedAtFivePercent() {
+        for level in 1...50 {
+            let clan = Clan(name: "Test", tag: "TEST", level: level, leaderID: "a")
+            XCTAssertLessThanOrEqual(clan.xpBonus, 1.05,
+                                     "Clan level \(level) grants more than a 5% bonus")
+        }
+    }
+
+    func testTaggedNameIncludesTheClanTag() {
+        var profile = PlayerProfile(displayName: "Vector")
+        XCTAssertEqual(profile.taggedName, "Vector")
+        profile.clan = Clan(name: "Strike Force", tag: "STRK", leaderID: profile.accountID)
+        XCTAssertEqual(profile.taggedName, "[STRK] Vector")
+    }
+}

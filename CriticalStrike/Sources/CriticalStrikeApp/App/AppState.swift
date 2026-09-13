@@ -60,6 +60,9 @@ final class AppState: ObservableObject {
         refreshMissions()
         lootService.restore(pity: profile.lootPity)
 
+        lobby.members = [LobbyMember(id: profile.accountID, displayName: profile.displayName,
+                                     level: profile.level, isReady: true, isLeader: true,
+                                     team: .strike)]
         matchmaker.onStateChanged = { [weak self] state in
             Task { @MainActor in self?.handleMatchmaking(state) }
         }
@@ -126,7 +129,8 @@ final class AppState: ObservableObject {
 
     func goBack() {
         switch route {
-        case .play, .loadout, .store, .battlePass, .missions, .profile, .leaderboard, .settings:
+        case .play, .loadout, .store, .battlePass, .missions, .profile, .leaderboard,
+             .social, .settings:
             go(to: .mainMenu)
         case .armory:
             go(to: .loadout)
@@ -445,6 +449,70 @@ final class AppState: ObservableObject {
             if let cosmetic = mission.cosmeticReward { profile.unlocks.unlockCosmetic(cosmetic) }
         }
         showToast("+\(mission.xpReward) XP", style: .reward)
+    }
+
+    // MARK: - Social
+
+    func createClan(name: String, tag: String) {
+        guard Clan.isValid(name: name) else {
+            showToast("Clan names are 3-24 characters", style: .warning)
+            return
+        }
+        guard Clan.isValid(tag: tag) else {
+            showToast("Tags are 2-4 letters or numbers", style: .warning)
+            return
+        }
+        guard profile.clan == nil else {
+            showToast("Leave your current clan first", style: .warning)
+            return
+        }
+        let accountID = profile.accountID
+        purchaseWithCurrency(cost: Clan.creationCostCoins, kind: .coins) { profile in
+            profile.clan = Clan(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                tag: tag, memberIDs: [accountID], leaderID: accountID)
+        }
+    }
+
+    func leaveClan() {
+        guard profile.clan != nil else { return }
+        update { $0.clan = nil }
+        showToast("Left the clan", style: .info)
+    }
+
+    func addFriend(code: String) {
+        let normalized = FriendCode.normalize(code)
+        guard FriendCode.isValid(normalized) else {
+            showToast("That is not a valid friend code", style: .warning)
+            return
+        }
+        guard normalized != profile.friendCode else {
+            showToast("That is your own code", style: .warning)
+            return
+        }
+        guard !profile.friends.contains(where: { $0.id == normalized }) else {
+            showToast("Already added", style: .info)
+            return
+        }
+        update { profile in
+            profile.friends.append(Friend(id: normalized, displayName: "Operator \(normalized.prefix(4))",
+                                          level: 1, lastSeen: Date(), isOnline: false))
+        }
+        showToast("Friend added", style: .success)
+    }
+
+    func removeFriend(_ friend: Friend) {
+        update { $0.friends.removeAll { $0.id == friend.id } }
+    }
+
+    func inviteToLobby(_ friend: Friend) {
+        guard !lobby.isFull else {
+            showToast("Lobby is full", style: .warning)
+            return
+        }
+        lobby.members.append(LobbyMember(id: friend.id, displayName: friend.displayName,
+                                         level: friend.level))
+        lobby.balanceTeams()
+        showToast("Invited \(friend.displayName)", style: .success)
     }
 
     // MARK: - Daily reward

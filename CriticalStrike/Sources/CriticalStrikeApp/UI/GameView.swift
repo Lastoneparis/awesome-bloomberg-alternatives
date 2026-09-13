@@ -6,7 +6,7 @@ import CriticalStrikeCore
 struct GameView: View {
     @EnvironmentObject private var app: AppState
     @State private var showPauseMenu = false
-    @State private var showChat = false
+    @State private var showPingWheel = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -19,7 +19,15 @@ struct GameView: View {
                     HUDView(session: session, size: geometry.size)
                         .allowsHitTesting(true)
 
-                    TouchControlsView(session: session, size: geometry.size)
+                    TouchControlsView(session: session, size: geometry.size) {
+                        showPingWheel = true
+                    }
+
+                    if showPingWheel {
+                        PingWheelView(
+                            onSelect: { kind in session.sendPing(kind: kind) },
+                            onDismiss: { showPingWheel = false })
+                    }
 
                     if session.showScoreboard {
                         ScoreboardOverlay(session: session)
