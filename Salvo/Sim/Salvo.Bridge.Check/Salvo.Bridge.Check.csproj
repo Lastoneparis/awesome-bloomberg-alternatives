@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Compiles the Unity bridge (Runtime/ and Editor/) against a stub UnityEngine, purely to
+    prove it is consistent C# and that every Salvo.Sim member it names exists. It produces no
+    artefact anyone ships. See ../Salvo.UnityShim/README.md for exactly what this does and
+    does not establish.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      CS0649 is "field is never assigned to". Every [SerializeField] private field trips it
+      here, because Unity's serializer is what assigns them and the shim has no serializer.
+      Unity itself suppresses this warning for exactly that reason. Suppressing it is
+      therefore matching Unity's behaviour, not hiding a problem — but it does mean this
+      project cannot catch a genuinely unused private field, which is a small price.
+    -->
+    <NoWarn>CS0649</NoWarn>
+    <AssemblyName>Salvo.Bridge.Check</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The same source files Unity compiles, from the same place. Not copies: a copy would
+         drift, and a drifted copy that compiles is worse than no check at all. -->
+    <Compile Include="../../Unity/Assets/Salvo/Runtime/**/*.cs" />
+    <Compile Include="../../Unity/Assets/Salvo/Editor/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Salvo.Sim.csproj" />
+    <ProjectReference Include="../Salvo.UnityShim/Salvo.UnityShim.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,133 @@
+# XcodeGen project definition.
+#
+#   brew install xcodegen
+#   cd CriticalStrike && xcodegen generate && open CriticalStrike.xcodeproj
+#
+# The project is generated rather than committed so there is never a merge conflict in a
+# 10,000-line pbxproj file.
+name: CriticalStrike
+options:
+  bundleIdPrefix: game.criticalstrike
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  xcodeVersion: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      GCC_OPTIMIZATION_LEVEL: "0"
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+    Release:
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+      SWIFT_COMPILATION_MODE: wholemodule
+      # The simulation is float-heavy; whole-module optimisation matters more here
+      # than in a typical app.
+      VALIDATE_PRODUCT: YES
+
+targets:
+  CriticalStrikeCore:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Sources/CriticalStrikeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: game.criticalstrike.core
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: NO
+        BUILD_LIBRARY_FOR_DISTRIBUTION: NO
+
+  CriticalStrike:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/CriticalStrikeApp
+      - path: Support/Assets.xcassets
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - target: CriticalStrikeCore
+    info:
+      path: Support/Info.plist
+      properties:
+        CFBundleDisplayName: Critical Strike
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: false
+        # Landscape only: a twin-stick shooter in portrait is unplayable.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~iphone:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiredDeviceCapabilities:
+          - armv7
+          - metal
+        # Metal is required; SceneKit's fallback renderer cannot hold the frame rate.
+        MetalCaptureEnabled: false
+        ITSAppUsesNonExemptEncryption: false
+        GKGameCenterEnabled: true
+        NSLocalNetworkUsageDescription: >-
+          Critical Strike uses your local network to find and join LAN matches
+          with players on the same Wi-Fi.
+        NSBonjourServices:
+          - _criticalstrike._udp
+        NSMicrophoneUsageDescription: >-
+          Enable voice chat to talk to your squad during a match. You can leave
+          this off and still play everything.
+        NSMotionUsageDescription: >-
+          Gyro aiming uses the device's motion sensors for fine aim adjustments.
+          It is off by default.
+        NSUserTrackingUsageDescription: >-
+          Allow tracking so the ads you see are more relevant. Declining changes
+          nothing about the game.
+        UIBackgroundModes: []
+        SKAdNetworkItems: []
+    entitlements:
+      path: Support/CriticalStrike.entitlements
+      properties:
+        com.apple.developer.game-center: true
+        com.apple.developer.networking.multicast: true
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: game.criticalstrike.ios
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+    scheme:
+      testTargets:
+        - CriticalStrikeCoreTests
+      gatherCoverageData: true
+      environmentVariables:
+        # Points the debug build at the local StoreKit configuration so purchases can be
+        # exercised end to end without App Store Connect.
+        SKTestingConfiguration: Support/CriticalStrike.storekit
+
+  CriticalStrikeCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/CriticalStrikeCoreTests
+    dependencies:
+      - target: CriticalStrikeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: game.criticalstrike.core.tests

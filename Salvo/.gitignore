@@ -1,0 +1,24 @@
+# .NET build output for the headless simulation projects.
+bin/
+obj/
+*.user
+
+# Unity generates these; none of them belong in version control.
+Unity/Library/
+Unity/Temp/
+Unity/Obj/
+Unity/Build/
+Unity/Builds/
+Unity/Logs/
+Unity/UserSettings/
+Unity/MemoryCaptures/
+Unity/Recordings/
+*.csproj.user
+*.unityproj
+*.sln.DotSettings.user
+
+# Never commit signing material or service credentials (brief §35).
+*.p12
+*.mobileprovision
+*.keystore
+secrets.json

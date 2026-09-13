@@ -1,0 +1,22 @@
+{
+    "name": "Salvo.Runtime",
+    "rootNamespace": "Salvo.Runtime",
+    "references": [
+        "Salvo.Sim",
+        "Unity.InputSystem",
+        "Unity.Netcode.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.Localization",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The simulation, compiled for .NET so it can be unit tested and run on a dedicated
+    server without Unity.
+
+    The source is NOT here: it lives in the Unity project, and this compiles those exact
+    files. One copy of the source, two toolchains, no possibility of drift.
+
+    netstandard2.1 is Unity 6's own profile. Targeting it means this compiler rejects
+    anything Unity could not compile — the restriction is the point.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Salvo.Sim</AssemblyName>
+    <RootNamespace>Salvo.Sim</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors></WarningsNotAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Unity/Assets/Salvo/Sim/**/*.cs" />
+  </ItemGroup>
+
+</Project>

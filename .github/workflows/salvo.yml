@@ -1,0 +1,167 @@
+name: Salvo
+
+# Salvo is the Unity FPS under Salvo/. It has its own workflow rather than sharing one with
+# CriticalStrike/ (the earlier Swift project) because they have nothing in common: different
+# language, different toolchain, different runner. One workflow doing both would mean every
+# Swift change waited on a .NET build and vice versa.
+on:
+  push:
+    paths:
+      - 'Salvo/**'
+      - '.github/workflows/salvo.yml'
+  pull_request:
+    paths:
+      - 'Salvo/**'
+      - '.github/workflows/salvo.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: salvo-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: Salvo/Sim
+
+jobs:
+  simulation:
+    name: Simulation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build the simulation
+        # netstandard2.1 with warnings as errors. The target framework is the guardrail: if
+        # this compiles, Unity can consume it, and anything that would not compile in Unity
+        # fails here instead of in someone's editor.
+        run: dotnet build Salvo.Sim.csproj -c Release --nologo
+
+      - name: Test the simulation
+        if: ${{ !cancelled() }}
+        run: dotnet test Salvo.Sim.Tests/Salvo.Sim.Tests.csproj -c Release --nologo --logger "console;verbosity=normal"
+
+      - name: Check the Unity bridge compiles
+        if: ${{ !cancelled() }}
+        # Compiles Unity/Assets/Salvo/{Runtime,Editor} against a stub UnityEngine. It does not
+        # prove the code matches real Unity (see Salvo.UnityShim/README.md), but it does prove
+        # the bridge is consistent C# and that every Salvo.Sim member it names still exists —
+        # which is what actually breaks when the simulation is refactored.
+        run: dotnet build Salvo.Bridge.Check/Salvo.Bridge.Check.csproj -c Release --nologo
+
+  playable:
+    name: Plays a match
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Play a full team deathmatch
+        # The real check that this is a game and not just a library that compiles. The runner
+        # exits non-zero if nobody moved, nobody shot, nobody was hit, nobody died, or anyone
+        # left the map — so a regression that leaves bots standing in their spawn fails CI
+        # rather than passing quietly.
+        run: dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --seconds 700
+
+      - name: Play a free-for-all
+        if: ${{ !cancelled() }}
+        run: dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --mode mode.ffa --bots 6 --seconds 600
+
+      - name: Play at every bot difficulty
+        if: ${{ !cancelled() }}
+        # Each difficulty is a separate content path through the bot code, and an Expert bot
+        # exercises timings an Easy one never reaches.
+        run: |
+          for difficulty in bot.easy bot.normal bot.hard bot.expert; do
+            echo "--- $difficulty"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+              --difficulty "$difficulty" --seconds 240 --seed 3
+          done
+
+      - name: Play a networked match on every link profile
+        if: ${{ !cancelled() }}
+        # The netcode runs against latency, jitter, loss and reordering rather than on a
+        # perfect loopback, because netcode only ever tested on a perfect link has not been
+        # tested. The runner checks the per-tick prediction error, the worst correction, the
+        # bandwidth against the budget, and whether the correction rate is explained by input
+        # loss — that last one is what catches reconciliation diverging rather than converging.
+        run: |
+          for link in perfect latency jitter loss reorder mobile poor; do
+            echo "--- $link"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+              --net --bots 8 --seconds 90 --link "$link"
+          done
+
+      - name: Play the second era, on its own map, in every mode
+        if: ${{ !cancelled() }}
+        # The architecture bar from PROJECT_PLAN.md: an era is content, not code. The wartime
+        # world ships bolt-action rifles, iron sights and a map built as a pit rather than a
+        # flat arena, and the engine has no code that knows any of that exists.
+        run: |
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --map map.quarry --bots 10 --seconds 700
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --map map.quarry --mode mode.overload --bots 10 --seconds 900
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --net --map map.quarry --bots 8 --seconds 90 --link mobile
+
+      - name: Play the 5v5 round-objective mode at every difficulty
+        if: ${{ !cancelled() }}
+        # Rounds, freeze time, elimination, a carried objective and a side swap — none of which
+        # deathmatch exercises. The runner fails if a whole match passes without the objective
+        # ever being armed, which is what a site placed inside geometry looks like from outside.
+        run: |
+          for difficulty in bot.easy bot.normal bot.hard bot.expert; do
+            echo "--- $difficulty"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+              --mode mode.overload --bots 10 --seconds 900 --difficulty "$difficulty"
+          done
+
+      - name: Run matchmaking over a population, on several seeds
+        if: ${{ !cancelled() }}
+        # Queues sixty players in parties of varying size with blocks scattered through them,
+        # forms matches, and checks the rules held across every match formed. Unit tests check
+        # each rule against two or three hand-written tickets; this is what found the matchmaker
+        # dropping selected-but-unplaceable tickets out of the queue entirely, and a party whose
+        # own members had blocked each other passing every check.
+        run: |
+          for seed in 1 2 3 4 5 6 7 8; do
+            echo "--- seed $seed"
+            dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --matchmaking --seed "$seed"
+          done
+
+      - name: Careers survive a restart
+        if: ${{ !cancelled() }}
+        # Two runs against one save directory. The second must show accounts carrying prior
+        # matches; if persistence silently starts everyone over, the "prior" column stays zero
+        # and nothing else in the run would notice.
+        run: |
+          SAVE=$(mktemp -d)
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --save "$SAVE" --seconds 700 > /tmp/run1.txt
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- --save "$SAVE" --seconds 700 > /tmp/run2.txt
+          sed -n '/--- progression/,/^$/p' /tmp/run2.txt
+          if ! awk '/^Bot[0-9]/ { if ($NF+0 > 0) found=1 } END { exit !found }' /tmp/run2.txt; then
+            echo "::error::the second run started every account from zero — careers are not persisting"
+            exit 1
+          fi
+          echo "careers carried over."
+
+      - name: A match replays identically from its seed
+        if: ${{ !cancelled() }}
+        # Client-side prediction depends on this absolutely. The wall-clock line is excluded
+        # because it is the one part of the output that is legitimately allowed to differ.
+        run: |
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+            --seed 4242 --seconds 240 | grep -v 'wall clock' > /tmp/run-a.txt
+          dotnet run --project Salvo.Headless/Salvo.Headless.csproj -c Release -- \
+            --seed 4242 --seconds 240 | grep -v 'wall clock' > /tmp/run-b.txt
+          if ! diff -u /tmp/run-a.txt /tmp/run-b.txt; then
+            echo "::error::the same seed produced two different matches — prediction is impossible"
+            exit 1
+          fi
+          echo "identical."

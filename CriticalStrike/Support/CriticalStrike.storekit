@@ -1,0 +1,218 @@
+{
+  "identifier": "CriticalStrike",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "1001",
+      "localizations": [
+        {
+          "description": "Handful of Gems",
+          "displayName": "Handful of Gems",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.gems.300",
+      "referenceName": "Handful of Gems",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "1002",
+      "localizations": [
+        {
+          "description": "Pouch of Gems",
+          "displayName": "Pouch of Gems",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.gems.800",
+      "referenceName": "Pouch of Gems",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "1003",
+      "localizations": [
+        {
+          "description": "Crate of Gems",
+          "displayName": "Crate of Gems",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.gems.1800",
+      "referenceName": "Crate of Gems",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "19.99",
+      "familyShareable": false,
+      "internalID": "1004",
+      "localizations": [
+        {
+          "description": "Case of Gems",
+          "displayName": "Case of Gems",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.gems.4000",
+      "referenceName": "Case of Gems",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "49.99",
+      "familyShareable": false,
+      "internalID": "1005",
+      "localizations": [
+        {
+          "description": "Vault of Gems",
+          "displayName": "Vault of Gems",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.gems.10000",
+      "referenceName": "Vault of Gems",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "1006",
+      "localizations": [
+        {
+          "description": "Season Pass",
+          "displayName": "Season Pass",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.battlepass.season",
+      "referenceName": "Season Pass",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "24.99",
+      "familyShareable": false,
+      "internalID": "1007",
+      "localizations": [
+        {
+          "description": "Season Pass + 25 Tiers",
+          "displayName": "Season Pass + 25 Tiers",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.battlepass.bundle",
+      "referenceName": "Season Pass + 25 Tiers",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": true,
+      "internalID": "1008",
+      "localizations": [
+        {
+          "description": "Starter Pack",
+          "displayName": "Starter Pack",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.pack.starter",
+      "referenceName": "Starter Pack",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "14.99",
+      "familyShareable": true,
+      "internalID": "1009",
+      "localizations": [
+        {
+          "description": "Reaper Operator Bundle",
+          "displayName": "Reaper Operator Bundle",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.pack.reaper",
+      "referenceName": "Reaper Operator Bundle",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "19.99",
+      "familyShareable": true,
+      "internalID": "1010",
+      "localizations": [
+        {
+          "description": "Dragonlord Collection",
+          "displayName": "Dragonlord Collection",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.pack.dragonlord",
+      "referenceName": "Dragonlord Collection",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "3.99",
+      "familyShareable": true,
+      "internalID": "1011",
+      "localizations": [
+        {
+          "description": "Remove Ads",
+          "displayName": "Remove Ads",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "game.criticalstrike.ios.removeads",
+      "referenceName": "Remove Ads",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "6000000001",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "20000001",
+      "localizations": [],
+      "name": "Membership",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "7.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "2001",
+          "introductoryOffer": {
+            "internalID": "3001",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P3D"
+          },
+          "localizations": [
+            {
+              "description": "+25% XP and credits, 150 gems daily, no ads.",
+              "displayName": "VIP Membership",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "game.criticalstrike.ios.sub.vip.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "VIP Monthly",
+          "subscriptionGroupID": "20000001",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}
