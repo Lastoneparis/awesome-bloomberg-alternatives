@@ -126,32 +126,45 @@ public enum Synth {
 
     // MARK: - Filtering
 
-    /// Chamberlin state-variable filter: low, band and high pass from one pass, stable at
-    /// the cutoffs a game needs, and cheap enough to run over a few seconds of audio at
-    /// load time without anyone noticing.
+    /// A topology-preserving-transform state-variable filter: low, band and high pass
+    /// from one pass, and unconditionally stable at every cutoff and resonance.
+    ///
+    /// The obvious Chamberlin form is only *conditionally* stable — it needs
+    /// `2·sin(π·fc/fs) < 2 − 1/Q` — and this file asks for cutoffs of 4.2 kHz on the music
+    /// tick, 5.2 kHz on the smoke hiss and 3.8 kHz on impact grit. All of those are past
+    /// the limit at ordinary resonance, and at 8 kHz the state diverges to infinity within
+    /// a few hundred samples. Real game sounds were being made by a filter that was blowing
+    /// up; `sanitized()` then quietly replaced the infinities with zeros.
+    ///
+    /// This form has no such condition. `g = tan(π·fc/fs)` prewarps the cutoff, and the
+    /// integrators are solved together rather than being stepped one sample behind.
     public enum FilterMode { case lowPass, bandPass, highPass }
+
+    /// Cutoff has to stay below Nyquist: `tan` goes to infinity there.
+    private static let maxCutoffFraction: Float = 0.45
 
     public static func filter(_ buffer: Waveform, mode: FilterMode, cutoff: Float,
                               resonance: Float = 0.7) -> Waveform {
         var out = buffer
-        let nyquist = buffer.sampleRate * 0.5
-        let clampedCutoff = MathUtil.clamp(cutoff, 10, nyquist * 0.98)
-        // The two-times-sine form is the standard SVF coefficient; it stays stable while
-        // the cutoff is below about a quarter of the sample rate, which is where every
-        // cutoff in this file sits.
-        let f = 2 * sin(.pi * MathUtil.clamp(clampedCutoff / buffer.sampleRate, 0.0001, 0.24))
-        let q = 1 / MathUtil.clamp(resonance, 0.5, 10)
+        let fc = MathUtil.clamp(cutoff, 10, buffer.sampleRate * maxCutoffFraction)
+        let g = tan(.pi * fc / buffer.sampleRate)
+        let k = 1 / MathUtil.clamp(resonance, 0.5, 10)
+        let a1 = 1 / (1 + g * (g + k))
+        let a2 = g * a1
+        let a3 = g * a2
 
-        var low: Float = 0, band: Float = 0
+        var ic1 : Float = 0, ic2: Float = 0
         for index in out.samples.indices {
             let input = buffer.samples[index]
-            let high = input - low - q * band
-            band += f * high
-            low += f * band
+            let v3 = input - ic2
+            let v1 = a1 * ic1 + a2 * v3
+            let v2 = ic2 + a2 * ic1 + a3 * v3
+            ic1 = 2 * v1 - ic1
+            ic2 = 2 * v2 - ic2
             switch mode {
-            case .lowPass: out.samples[index] = low
-            case .bandPass: out.samples[index] = band
-            case .highPass: out.samples[index] = high
+            case .lowPass: out.samples[index] = v2
+            case .bandPass: out.samples[index] = v1
+            case .highPass: out.samples[index] = input - k * v1 - v2
             }
         }
         return out
@@ -163,17 +176,26 @@ public enum Synth {
                                        to endCutoff: Float, resonance: Float = 0.7) -> Waveform {
         var out = buffer
         guard buffer.count > 0 else { return out }
-        let q = 1 / MathUtil.clamp(resonance, 0.5, 10)
-        var low: Float = 0, band: Float = 0
+        let k = 1 / MathUtil.clamp(resonance, 0.5, 10)
+        let nyquist = buffer.sampleRate * maxCutoffFraction
+        let inverseCount = 1 / Float(buffer.count)
+        var ic1: Float = 0, ic2: Float = 0
+
         for index in out.samples.indices {
-            let t = Float(index) / Float(buffer.count)
-            let cutoff = startCutoff + (endCutoff - startCutoff) * t
-            let f = 2 * sin(.pi * MathUtil.clamp(cutoff / buffer.sampleRate, 0.0001, 0.24))
+            let t = Float(index) * inverseCount
+            let fc = MathUtil.clamp(startCutoff + (endCutoff - startCutoff) * t, 10, nyquist)
+            let g = tan(.pi * fc / buffer.sampleRate)
+            let a1 = 1 / (1 + g * (g + k))
+            let a2 = g * a1
+            let a3 = g * a2
+
             let input = buffer.samples[index]
-            let high = input - low - q * band
-            band += f * high
-            low += f * band
-            out.samples[index] = low
+            let v3 = input - ic2
+            let v1 = a1 * ic1 + a2 * v3
+            let v2 = ic2 + a2 * ic1 + a3 * v3
+            ic1 = 2 * v1 - ic1
+            ic2 = 2 * v2 - ic2
+            out.samples[index] = v2
         }
         return out
     }

@@ -148,31 +148,43 @@ def decay_tail(buf, half_life):
 
 
 def svf(buf, mode, cutoff, resonance=0.7):
-    cutoff = clamp(cutoff, 10, RATE * 0.49)
-    f = 2 * math.sin(math.pi * clamp(cutoff / RATE, 0.0001, 0.24))
-    q = 1 / clamp(resonance, 0.5, 10)
-    low = band = 0.0
+    """TPT state-variable filter — unconditionally stable, mirrors Synth.filter."""
+    fc = clamp(cutoff, 10.0, RATE * 0.45)
+    g = math.tan(math.pi * fc / RATE)
+    k = 1.0 / clamp(resonance, 0.5, 10.0)
+    a1 = 1.0 / (1.0 + g * (g + k))
+    a2 = g * a1
+    a3 = g * a2
+    ic1 = ic2 = 0.0
     out = [0.0] * len(buf)
     for i, x in enumerate(buf):
-        high = x - low - q * band
-        band += f * high
-        low += f * band
-        out[i] = {'low': low, 'band': band, 'high': high}[mode]
+        v3 = x - ic2
+        v1 = a1 * ic1 + a2 * v3
+        v2 = ic2 + a2 * ic1 + a3 * v3
+        ic1 = 2 * v1 - ic1
+        ic2 = 2 * v2 - ic2
+        out[i] = {'low': v2, 'band': v1, 'high': x - k * v1 - v2}[mode]
     return out
 
 
 def sweeping_low_pass(buf, start, end, resonance=0.7):
-    q = 1 / clamp(resonance, 0.5, 10)
-    low = band = 0.0
-    out = [0.0] * len(buf)
+    k = 1.0 / clamp(resonance, 0.5, 10.0)
+    nyq = RATE * 0.45
     n = len(buf) or 1
+    ic1 = ic2 = 0.0
+    out = [0.0] * len(buf)
     for i, x in enumerate(buf):
-        cutoff = start + (end - start) * (i / float(n))
-        f = 2 * math.sin(math.pi * clamp(cutoff / RATE, 0.0001, 0.24))
-        high = x - low - q * band
-        band += f * high
-        low += f * band
-        out[i] = low
+        fc = clamp(start + (end - start) * (i / float(n)), 10.0, nyq)
+        g = math.tan(math.pi * fc / RATE)
+        a1 = 1.0 / (1.0 + g * (g + k))
+        a2 = g * a1
+        a3 = g * a2
+        v3 = x - ic2
+        v1 = a1 * ic1 + a2 * v3
+        v2 = ic2 + a2 * ic1 + a3 * v3
+        ic1 = 2 * v1 - ic1
+        ic2 = 2 * v2 - ic2
+        out[i] = v2
     return out
 
 

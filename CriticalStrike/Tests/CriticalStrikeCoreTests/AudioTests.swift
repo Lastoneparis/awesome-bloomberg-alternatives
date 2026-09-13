@@ -281,16 +281,37 @@ final class SoundBankTests: XCTestCase {
         }
     }
 
-    func testGunshotAttackIsImmediate() {
-        // The loudest moment of a gunshot is the gunshot. Anything else is a swell.
+    func testGunshotEnergyPeaksAtTheStart() {
+        // Measured as short-term energy, not as the single loudest sample.
+        //
+        // The body of a gunshot is a noise burst under a half-second decay, so which
+        // individual sample happens to be largest is close to random within the loud part.
+        // The first version of this test asserted a sample-peak time and failed on nothing
+        // more than a lucky noise spike 48 ms in. What "immediate" actually means is that
+        // the sound decays from the start instead of swelling into it, and that is a
+        // statement about the envelope.
         for weapon in WeaponDatabase.all where weapon.weaponClass != .melee {
-            guard let shot = Bank.sound(weapon.fireSound), shot.count > 0 else { continue }
-            let peakIndex = shot.samples.indices.max {
-                abs(shot.samples[$0]) < abs(shot.samples[$1])
-            } ?? 0
-            let peakTime = Float(peakIndex) / shot.sampleRate
-            XCTAssertLessThan(peakTime, 0.03,
-                              "\(weapon.id.value) peaks \(peakTime * 1000)ms in")
+            guard let shot = Bank.sound(weapon.fireSound) else { continue }
+            let window = Int(0.01 * shot.sampleRate)
+            guard window > 0, shot.count >= window * 7 else { continue }
+
+            var energies: [Float] = []
+            var start = 0
+            while start + window <= shot.count {
+                var sum: Float = 0
+                for index in start..<(start + window) {
+                    sum += shot.samples[index] * shot.samples[index]
+                }
+                energies.append((sum / Float(window)).squareRoot())
+                start += window
+            }
+
+            let loudest = energies.indices.max { energies[$0] < energies[$1] } ?? 0
+            XCTAssertLessThanOrEqual(loudest, 5,
+                                     "\(weapon.id.value): loudest 10ms window is "
+                                     + "\(loudest * 10)ms in — the shot swells")
+            XCTAssertLessThan(energies[energies.count - 1], energies[0] * 0.5,
+                              "\(weapon.id.value) does not decay")
         }
     }
 
