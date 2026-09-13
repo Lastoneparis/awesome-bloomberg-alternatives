@@ -99,6 +99,13 @@ def sweep(start, end, seconds, kind='sine', curve=2.5):
     n = int(seconds * RATE)
     out = [0.0] * n
     acc = 0.0
+    if start == end:
+        # Steady tone: no glide maths, same as the Swift fast path.
+        step = start / RATE
+        for i in range(n):
+            acc += step
+            out[i] = wave_sample(kind, acc)
+        return out
     for i in range(n):
         t = i / float(n) if n else 0.0
         f = end + (start - end) * ((1 - t) ** curve)

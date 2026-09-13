@@ -559,7 +559,15 @@ public enum SoundBank {
     /// noticing the seam or getting tired of it.
     public static func ambience(named name: String) -> Waveform {
         let seed = hash(name)
+        #if DEBUG
+        // Unoptimised, a full-length bed takes long enough to make the test suite and a
+        // debug launch painful. Shortened, not truncated: still comfortably longer than a
+        // listener notices, so the tests that check bed length stay meaningful. Release is
+        // unaffected, exactly as with the texture resolutions.
+        let seconds: Float = 7
+        #else
         let seconds: Float = 8
+        #endif
         var bed: Waveform
 
         switch name {
@@ -629,7 +637,11 @@ public enum SoundBank {
         let seed = hash(name)
         let bpm: Float = name == "mus_menu" ? 84 : 96
         let beat = 60 / bpm
+        #if DEBUG
+        let bars = 3
+        #else
         let bars = 8
+        #endif
         let seconds = beat * 4 * Float(bars)
         // Keys chosen so the five maps do not all sound the same. A2 rather than A1: an
         // octave lower measured beautifully and would have been inaudible, because a phone

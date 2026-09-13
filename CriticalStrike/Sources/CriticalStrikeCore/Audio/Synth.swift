@@ -43,8 +43,22 @@ public enum Synth {
         guard buffer.count > 0 else { return buffer }
         var accumulated = phase
         let inverseRate = 1 / sampleRate
+
+        // A steady tone is the common case — the drones and pads under every music bed are
+        // twenty seconds each — and it does not need the glide maths at all. Calling pow()
+        // a million times to compute a constant is most of what a bed used to cost.
+        if startFrequency == endFrequency {
+            let step = startFrequency * inverseRate
+            for index in buffer.samples.indices {
+                accumulated += step
+                buffer.samples[index] = sample(wave, phase: accumulated)
+            }
+            return buffer
+        }
+
+        let inverseCount = 1 / Float(buffer.count)
         for index in buffer.samples.indices {
-            let t = Float(index) / Float(buffer.count)
+            let t = Float(index) * inverseCount
             // Exponential glide, because pitch is perceived logarithmically; a linear
             // sweep spends most of its time at the top and sounds like a whistle.
             let blend = pow(1 - t, curve)
