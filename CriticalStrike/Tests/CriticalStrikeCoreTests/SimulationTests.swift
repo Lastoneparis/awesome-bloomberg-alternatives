@@ -479,18 +479,24 @@ final class MapIntegrityTests: XCTestCase {
     }
 
     func testEveryBrushIsWellFormed() {
+        // Collected, then asserted once. Six assertions per brush across five maps is tens
+        // of thousands of trips through XCTest's reporting machinery, and it buys nothing:
+        // one failure naming the offending brushes says more than the first of thousands.
+        var malformed: [String] = []
         for map in MapDatabase.all {
             for (index, brush) in map.brushes.enumerated() {
                 let box = brush.box
-                XCTAssertLessThanOrEqual(box.min.x, box.max.x, "\(map.id.value) brush \(index) x")
-                XCTAssertLessThanOrEqual(box.min.y, box.max.y, "\(map.id.value) brush \(index) y")
-                XCTAssertLessThanOrEqual(box.min.z, box.max.z, "\(map.id.value) brush \(index) z")
-                XCTAssertTrue(box.min.x.isFinite && box.min.y.isFinite && box.min.z.isFinite,
-                              "\(map.id.value) brush \(index) has a non-finite corner")
-                XCTAssertTrue(box.max.x.isFinite && box.max.y.isFinite && box.max.z.isFinite,
-                              "\(map.id.value) brush \(index) has a non-finite corner")
+                let ordered = box.min.x <= box.max.x && box.min.y <= box.max.y
+                    && box.min.z <= box.max.z
+                let finite = box.min.x.isFinite && box.min.y.isFinite && box.min.z.isFinite
+                    && box.max.x.isFinite && box.max.y.isFinite && box.max.z.isFinite
+                if !ordered || !finite {
+                    malformed.append("\(map.id.value)[\(index)] \(box.min) … \(box.max)")
+                }
             }
         }
+        XCTAssertTrue(malformed.isEmpty,
+                      "malformed brushes: \(malformed.prefix(10).joined(separator: ", "))")
     }
 
     func testAABBOrdersItsCorners() {
@@ -525,11 +531,12 @@ final class MapIntegrityTests: XCTestCase {
     }
 
     func testEverySpawnIsInsideTheMapBounds() {
+        var outside: [String] = []
         for map in MapDatabase.all {
-            for spawn in map.spawns {
-                XCTAssertTrue(map.bounds.contains(spawn.position),
-                              "\(map.id.value) spawn at \(spawn.position) is outside the map")
+            for spawn in map.spawns where !map.bounds.contains(spawn.position) {
+                outside.append("\(map.id.value) at \(spawn.position)")
             }
         }
+        XCTAssertTrue(outside.isEmpty, "spawns outside their map: \(outside.joined(separator: ", "))")
     }
 }
