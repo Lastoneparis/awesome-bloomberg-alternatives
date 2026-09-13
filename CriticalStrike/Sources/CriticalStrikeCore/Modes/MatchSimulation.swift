@@ -47,8 +47,10 @@ public final class MatchSimulation {
 
     public init(map: MapData, mode: GameModeData, seed: UInt64 = 0x5C0FFEE, events: EventBus = EventBus()) {
         self.map = map
-        self.world = CollisionWorld(map: map)
-        self.nav = NavGraph(map: map, world: world)
+        // Shared across every match on this map: baking the nav mesh is thousands of ray
+        // traces and the result cannot differ between matches.
+        self.world = MapWorldCache.world(for: map)
+        self.nav = MapWorldCache.nav(for: map, world: world)
         self.events = events
         self.state = MatchState(mode: mode, mapID: map.id)
         self.rng = DeterministicRandom(seed: seed)

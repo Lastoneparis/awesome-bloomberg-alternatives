@@ -506,6 +506,31 @@ final class MapIntegrityTests: XCTestCase {
         XCTAssertEqual(inverted.size, Vec3(6, 6, 5))
     }
 
+    func testWorldDataIsSharedBetweenMatchesOnTheSameMap() {
+        // Two simulations on one map must get the same baked world, or every match restart
+        // pays for a couple of thousand ray traces it does not need.
+        let mode = GameModeDatabase.mode(.teamDeathmatch)
+        let first = MatchSimulation(map: MapDatabase.vault, mode: mode)
+        let second = MatchSimulation(map: MapDatabase.vault, mode: mode)
+        XCTAssertTrue(first.world === second.world)
+        XCTAssertTrue(first.nav === second.nav)
+
+        // A different map must not get the first one's geometry.
+        let other = MatchSimulation(map: MapDatabase.sandstorm, mode: mode)
+        XCTAssertFalse(first.world === other.world)
+    }
+
+    func testAuthoredMapsDoNotInheritACachedWorld() {
+        // Tests author maps and reuse ids freely; handing one of those a world baked from
+        // different geometry would be much worse than rebuilding it.
+        var author = MapAuthor()
+        author.block(x: -4...4, z: -4...4, height: 1)
+        let bounds = AABB(min: Vec3(-10, -2, -10), max: Vec3(10, 10, 10))
+        let small = MapData(id: "map_vault", name: "Tiny", summary: "",
+                            bounds: bounds, brushes: author.brushes)
+        XCTAssertFalse(MapWorldCache.world(for: small) === MapWorldCache.world(for: MapDatabase.vault))
+    }
+
     func testCollisionWorldBuildsForEveryMap() {
         // Building the grid is what actually crashed: it walks min-cell to max-cell as a
         // range, so an inverted brush is a trap rather than a harmless oddity.
