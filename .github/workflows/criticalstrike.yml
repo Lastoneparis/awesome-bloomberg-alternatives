@@ -44,12 +44,38 @@ jobs:
       - name: Build the core library
         working-directory: CriticalStrike
         run: swift build --target CriticalStrikeCore
-      - name: Run the simulation tests
+      # One step per suite, each with its own deadline. A single `swift test` that hangs
+      # says nothing about where; this way the step that stalls names the suite, and every
+      # other suite still reports. Output goes through a pty so XCTest line-buffers it —
+      # piped, it block-buffers and a slow suite looks exactly like a hung one.
+      - name: Test maths
         working-directory: CriticalStrike
-        # Through a pty, so XCTest's output is line buffered and progress actually appears
-        # in the log. Piped straight to a file it block-buffers, and a slow suite is
-        # indistinguishable from a hung one — which cost a lot of guessing.
-        run: script -q /dev/null swift test
+        timeout-minutes: 5
+        run: script -q /dev/null swift test --filter "MathTests|NoiseTests|ScalarFieldTests|RGBTests"
+      - name: Test audio synthesis
+        working-directory: CriticalStrike
+        timeout-minutes: 8
+        run: script -q /dev/null swift test --filter "WaveformTests|SynthTests|SoundBankTests"
+      - name: Test combat
+        working-directory: CriticalStrike
+        timeout-minutes: 5
+        run: script -q /dev/null swift test --filter "DamageModelTests|WeaponBalanceTests"
+      - name: Test economy and progression
+        working-directory: CriticalStrike
+        timeout-minutes: 5
+        run: script -q /dev/null swift test --filter "WalletTests|LootCrateTests|ProgressionTests|BattlePassTests|MissionTests|PersistenceTests|ContentIntegrityTests|SocialTests"
+      - name: Test netcode
+        working-directory: CriticalStrike
+        timeout-minutes: 6
+        run: script -q /dev/null swift test --filter "BitStreamTests|ProtocolTests|SnapshotTests|InterpolationBufferTests|LagCompensationTests|AntiCheatTests|TransportTests"
+      - name: Test simulation
+        working-directory: CriticalStrike
+        timeout-minutes: 8
+        run: script -q /dev/null swift test --filter "CollisionTests|MovementTests|WeaponSystemTests|BallisticsTests|MatchFlowTests|MapIntegrityTests"
+      - name: Test navigation
+        working-directory: CriticalStrike
+        timeout-minutes: 8
+        run: script -q /dev/null swift test --filter "NavigationTests"
 
   build-app:
     name: Build the iOS app
