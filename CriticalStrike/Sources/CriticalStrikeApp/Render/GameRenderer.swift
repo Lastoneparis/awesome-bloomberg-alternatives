@@ -15,6 +15,7 @@ final class GameRenderer: NSObject {
     private(set) var viewModel: WeaponViewModel
     private(set) var effects: EffectsSystem
 
+    let textures: TextureLibrary
     private let materials: MaterialLibrary
     private let worldRoot = SCNNode()
     private let dynamicRoot = SCNNode()
@@ -45,43 +46,25 @@ final class GameRenderer: NSObject {
     private var currentRenderScale: Float = 1
     private weak var sceneView: SCNView?
 
-    init(map: MapData, settings: GameSettings) {
+    init(map: MapData, settings: GameSettings, textures: TextureLibrary) {
         self.map = map
         self.settings = settings
         self.quality = settings.quality
-        self.materials = MaterialLibrary(quality: settings.quality)
+        self.textures = textures
+        self.materials = MaterialLibrary(textures: textures)
         self.viewModel = WeaponViewModel(materials: materials)
         self.effects = EffectsSystem(root: dynamicRoot, materials: materials, quality: settings.quality)
         super.init()
-        buildScene()
+        buildCamera()
     }
 
     // MARK: - Scene construction
 
-    private func buildScene() {
+    /// Cheap setup only: no materials are touched here, so the renderer can be created
+    /// before the texture library has finished generating.
+    private func buildCamera() {
         scene.rootNode.addChildNode(worldRoot)
         scene.rootNode.addChildNode(dynamicRoot)
-
-        let built = MapBuilder.build(map: map, materials: materials, quality: quality)
-        worldRoot.addChildNode(built.root)
-        objectiveNodes = built.objectiveNodes
-        spawnMarkers = built.spawnMarkers
-
-        // Environment
-        scene.background.contents = skyColor()
-        scene.lightingEnvironment.contents = skyColor()
-        scene.lightingEnvironment.intensity = 1.1
-        if quality != .low {
-            scene.fogColor = UIColor(hex: map.environment.fogColorHex)
-            scene.fogStartDistance = CGFloat(map.environment.fogStart)
-            scene.fogEndDistance = CGFloat(map.environment.fogEnd)
-            scene.fogDensityExponent = CGFloat(map.environment.fogDensity)
-        }
-
-        // Static geometry never moves, so let SceneKit skip its transform updates.
-        worldRoot.enumerateChildNodes { node, _ in
-            node.movabilityHint = .fixed
-        }
 
         // Camera
         let camera = SCNCamera()
@@ -109,6 +92,44 @@ final class GameRenderer: NSObject {
         scene.physicsWorld.gravity = SCNVector3(0, -MovementSystem.gravity, 0)
         scene.physicsWorld.speed = 1
     }
+
+    /// Builds the level and the sky. Call once, after the textures are warm.
+    func buildWorld() {
+        guard !hasBuiltWorld else { return }
+        hasBuiltWorld = true
+
+        let built = MapBuilder.build(map: map, materials: materials, quality: quality)
+        worldRoot.addChildNode(built.root)
+        objectiveNodes = built.objectiveNodes
+        spawnMarkers = built.spawnMarkers
+
+        // A generated cube map does double duty: it is what the player sees past the
+        // skybox clip, and it lights every metallic surface in the level through
+        // image-based lighting.
+        let cubeMap = materials.skyCubeMap(for: map.environment)
+        if cubeMap.count == 6 {
+            scene.background.contents = cubeMap
+            scene.lightingEnvironment.contents = cubeMap
+        } else {
+            scene.background.contents = skyColor()
+            scene.lightingEnvironment.contents = skyColor()
+        }
+        scene.lightingEnvironment.intensity = quality == .low ? 0.7 : 1.15
+
+        if quality != .low {
+            scene.fogColor = UIColor(hex: map.environment.fogColorHex)
+            scene.fogStartDistance = CGFloat(map.environment.fogStart)
+            scene.fogEndDistance = CGFloat(map.environment.fogEnd)
+            scene.fogDensityExponent = CGFloat(map.environment.fogDensity)
+        }
+
+        // Static geometry never moves, so let SceneKit skip its transform updates.
+        worldRoot.enumerateChildNodes { node, _ in
+            node.movabilityHint = .fixed
+        }
+    }
+
+    private var hasBuiltWorld = false
 
     private func skyColor() -> UIColor {
         UIColor(hex: map.environment.fogColorHex).darkened(by: 0.85)

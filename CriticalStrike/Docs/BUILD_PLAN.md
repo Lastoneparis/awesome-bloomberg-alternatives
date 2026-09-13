@@ -71,6 +71,19 @@ This file is the checklist the build loop works through. Anything unchecked is n
 - [x] Network transport (WebSocket client, LAN host via Network.framework)
 - [x] Game session glue (sim + render + input + net)
 
+## Phase 9.4 — Procedural art
+- [x] Tileable noise library (value, gradient, fBm, ridged, cellular, warp, seamless wave)
+- [x] Height-field based PBR synthesis (albedo, normal, roughness, occlusion, metalness)
+- [x] Twelve world surfaces with real material structure
+- [x] Ten weapon skin patterns driven by palette + pattern
+- [x] Generated skyboxes as cube maps, also used for image-based lighting
+- [x] Particle sprites and per-surface decals
+- [x] World-space UVs so texel density is constant across the level
+- [x] Parallel generation during loading + PNG disk cache
+- [x] Map previews rendered from level data
+- [x] App icon and wordmark generated with a pure-Python PNG encoder
+- [x] Preview tooling for reviewing the art without a Mac
+
 ## Phase 9.5 — Social
 - [x] Clans (tag, weekly level, capped XP bonus), friend codes, friends list
 - [x] In-match ping wheel

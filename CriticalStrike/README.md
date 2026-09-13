@@ -33,7 +33,7 @@ CriticalStrike/
 │       └── Services/                 Game Center, haptics, ads, device tiers
 ├── Tests/CriticalStrikeCoreTests/    Unit and integration tests for the whole simulation
 ├── Support/                          Info.plist, entitlements, StoreKit config
-├── Tools/validate.py                 Static checks that run without a Swift toolchain
+├── Tools/                            Static checks and asset generation, no toolchain needed
 └── Docs/                             Architecture, gameplay, netcode, monetisation
 ```
 
@@ -92,10 +92,13 @@ code actually rolls; a daily shop; and rewarded ads that are always optional.
 **Progression** — 55 levels with prestige, competitive ranks with Elo-style rating,
 per-weapon attachment unlocks, lifetime stats, and daily/weekly/career missions.
 
-**Presentation** — Procedurally generated materials (the app ships no bitmap textures), a
-first-person viewmodel with sway, bob, ADS springs and recoil, pooled effects with budgets,
-ragdolls, dynamic resolution driven by frame time and thermal state, spatial audio, and
-Core Haptics feedback that distinguishes a body shot from a headshot.
+**Presentation** — A full procedural PBR pipeline: tileable noise → height field → albedo,
+normal, roughness, occlusion and metalness, generated in parallel during loading and cached
+to disk. Generated skyboxes that also drive image-based lighting, world-space UVs so texel
+density is constant across the level, a first-person viewmodel with sway, bob, ADS springs
+and recoil, sprite-backed effects with budgets, ragdolls, dynamic resolution driven by frame
+time and thermal state, spatial audio, and Core Haptics feedback that distinguishes a body
+shot from a headshot.
 
 **Accessibility** — Colour-blind palettes, a fully repositionable HUD, left-handed layout,
 three fire modes including auto-fire, four aim-assist levels, and adjustable sensitivity
@@ -109,11 +112,20 @@ curves per aim state.
 | [GAMEPLAY.md](Docs/GAMEPLAY.md) | Combat maths, movement, balance philosophy, mode rules |
 | [NETCODE.md](Docs/NETCODE.md) | Prediction, reconciliation, interpolation, lag compensation |
 | [MONETIZATION.md](Docs/MONETIZATION.md) | Every product, published crate odds, App Store compliance |
+| [TEXTURES.md](Docs/TEXTURES.md) | The procedural art pipeline, with preview sheets |
 | [BUILD_PLAN.md](Docs/BUILD_PLAN.md) | The checklist this project was built against |
 
 ## Assets
 
-The game ships with no bitmap textures, meshes or audio files. Materials and level geometry
-are generated at runtime, and weapons and characters are assembled from primitives sized per
-class. Sound effects are looked up by name and simply do not play if a file is absent, so
-dropping real audio into the bundle is the only thing needed to complete the presentation.
+The game ships with no painted textures, no meshes and no baked lighting. Every material —
+twelve world surfaces, ten weapon finishes, every particle sprite, every bullet hole, and
+the skyboxes — is generated on the device at load time from tileable noise, with albedo,
+normal, roughness, occlusion and metalness maps all derived from one shared height field so
+the lighting agrees with the visible detail. See [TEXTURES.md](Docs/TEXTURES.md).
+
+The only committed images are the App Store icon and the menu wordmark, which have to exist
+before the app launches; both are produced by `Tools/generate_assets.py`, which includes its
+own PNG encoder so there is nothing to install.
+
+Sound effects are looked up by name and simply do not play if a file is absent, so dropping
+real audio into the bundle is the only thing needed to complete the presentation.

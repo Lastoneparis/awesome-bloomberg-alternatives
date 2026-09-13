@@ -31,6 +31,7 @@ final class GameSession: NSObject, ObservableObject {
 
     // MARK: Systems
     private(set) var gameRenderer: GameRenderer
+    let textures: TextureLibrary
     let controls = TouchControls()
     private let audio: AudioEngine
     private let haptics: HapticsService
@@ -76,7 +77,9 @@ final class GameSession: NSObject, ObservableObject {
         self.server = server
         self.sim = server.sim
         self.botDirector = server.botDirector
-        self.gameRenderer = GameRenderer(map: map, settings: profile.settings)
+        let textures = TextureLibrary(quality: profile.settings.quality)
+        self.textures = textures
+        self.gameRenderer = GameRenderer(map: map, settings: profile.settings, textures: textures)
         super.init()
 
         controls.settings = profile.settings
@@ -96,21 +99,32 @@ final class GameSession: NSObject, ObservableObject {
     // MARK: - Setup
 
     func prepare() async {
-        onProgress?(0.1)
+        onProgress?(0.05)
         // Fill the roster.
         botDirector.fillMatch(sim)
         for player in sim.allPlayers() {
             playerNames[player.id] = player.name
             weaponBuilds[player.id] = player.loadout.primary
         }
-        onProgress?(0.45)
+        onProgress?(0.1)
 
-        audio.preload(for: map, loadout: sim.player(localPlayerID)?.loadout ?? Loadout.starter())
-        onProgress?(0.7)
+        // Generate every texture this map and loadout need, in parallel. This is the bulk
+        // of the loading time on a first run; on later runs the disk cache makes it
+        // almost free. Nothing touches a material before this finishes, so no texture is
+        // ever generated on the render thread mid-match.
+        let loadout = sim.player(localPlayerID)?.loadout ?? Loadout.starter()
+        let report = onProgress
+        await textures.warmUp(map: map, loadout: loadout) { value in
+            report?(0.1 + value * 0.7)
+        }
 
+        audio.preload(for: map, loadout: loadout)
+        onProgress?(0.85)
+
+        // Build the level and sky now that the textures exist.
+        gameRenderer.buildWorld()
         gameRenderer.setLocalPlayer(localPlayerID, team: sim.player(localPlayerID)?.team ?? .none)
         gameRenderer.showSpawnMarkers(true)
-        onProgress?(0.9)
         onProgress?(1.0)
     }
 

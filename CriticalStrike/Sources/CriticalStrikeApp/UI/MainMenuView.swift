@@ -302,13 +302,16 @@ struct PlayView: View {
                         app.selectedMapID = map.id
                     } label: {
                         VStack(spacing: 3) {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Theme.surfaceElevated)
+                            MapPreviewImage(map: map, size: CGSize(width: 110, height: 56))
                                 .frame(width: 110, height: 56)
-                                .overlay(
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(alignment: .bottomLeading) {
                                     Text(map.name)
-                                        .font(Theme.caption(11))
-                                        .foregroundStyle(Theme.textPrimary))
+                                        .font(Theme.caption(10))
+                                        .foregroundStyle(Theme.textPrimary)
+                                        .padding(4)
+                                        .shadow(color: .black, radius: 2)
+                                }
                             Text(map.summary)
                                 .font(Theme.caption(8))
                                 .foregroundStyle(Theme.textTertiary)
@@ -324,6 +327,24 @@ struct PlayView: View {
     }
 }
 
+/// Renders a map's top-down preview, cached so scrolling does not re-render it.
+struct MapPreviewImage: View {
+    let map: MapData
+    let size: CGSize
+
+    var body: some View {
+        Group {
+            if let image = MapPreviewCache.shared.preview(for: map, size: size) {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle().fill(Theme.surfaceElevated)
+            }
+        }
+    }
+}
+
 struct LoadingView: View {
     let progress: Double
     let mapID: MapID
@@ -332,6 +353,11 @@ struct LoadingView: View {
         let map = MapDatabase.mapOrDefault(mapID)
         ZStack {
             Theme.background.ignoresSafeArea()
+            // The loading screen shows the actual layout, generated from the level data.
+            MapPreviewImage(map: map, size: CGSize(width: 900, height: 500))
+                .ignoresSafeArea()
+                .opacity(0.28)
+                .blur(radius: 1.5)
             VStack(spacing: 14) {
                 Spacer()
                 Text(map.name.uppercased())

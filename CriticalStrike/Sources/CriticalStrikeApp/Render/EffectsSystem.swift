@@ -42,23 +42,25 @@ final class EffectsSystem {
         let scale = CGFloat(weapon.muzzleFlashScale)
         let flash = SCNNode()
 
-        // Core: an additive billboard that scales down over two frames.
-        let plane = SCNPlane(width: 0.22 * scale, height: 0.22 * scale)
-        plane.firstMaterial = materials.emissiveMaterial(
-            color: UIColor(hex: weapon.tracerColorHex), intensity: 1.6)
+        // Core: a generated flash sprite, so the edge falls off instead of ending in a
+        // hard square the way an untextured plane does.
+        let plane = SCNPlane(width: 0.26 * scale, height: 0.26 * scale)
+        plane.firstMaterial = materials.spriteMaterial(.muzzleCore,
+                                                       tint: UIColor(hex: weapon.tracerColorHex))
         let planeNode = SCNNode(geometry: plane)
         planeNode.constraints = [SCNBillboardConstraint()]
+        planeNode.eulerAngles.z = Float.random(in: 0...(2 * .pi))
         flash.addChildNode(planeNode)
 
-        // Star flare for the bigger calibres.
-        if scale > 1.2 {
-            let flare = SCNPlane(width: 0.5 * scale, height: 0.06 * scale)
-            flare.firstMaterial = materials.emissiveMaterial(
-                color: UIColor(hex: weapon.tracerColorHex), intensity: 1.1)
-            let flareNode = SCNNode(geometry: flare)
-            flareNode.constraints = [SCNBillboardConstraint()]
-            flash.addChildNode(flareNode)
-        }
+        // Star flare, rotated randomly so consecutive shots never look identical.
+        let flare = SCNPlane(width: 0.62 * scale, height: 0.62 * scale)
+        flare.firstMaterial = materials.spriteMaterial(.muzzleStar,
+                                                       tint: UIColor(hex: weapon.tracerColorHex))
+        let flareNode = SCNNode(geometry: flare)
+        flareNode.constraints = [SCNBillboardConstraint()]
+        flareNode.eulerAngles.z = Float.random(in: 0...(2 * .pi))
+        flareNode.opacity = CGFloat(0.6 + scale * 0.2)
+        flash.addChildNode(flareNode)
 
         // A real light so the flash bounces off nearby geometry — the single biggest
         // "this looks like a real game" upgrade for the cost.
@@ -111,8 +113,12 @@ final class EffectsSystem {
 
     private func buildTracerPool() {
         for _ in 0..<tracerPoolSize {
-            let node = SCNNode(geometry: SCNBox(width: 0.018, height: 0.018, length: 1,
-                                                chamferRadius: 0))
+            // A quad whose local +Y runs along the beam. `freeAxes: .Y` then spins it
+            // about the beam to face the camera, which is how every engine draws a
+            // tracer — a solid box reads as a stick from the side and vanishes head on.
+            let plane = SCNPlane(width: 0.05, height: 1)
+            let node = SCNNode(geometry: plane)
+            node.constraints = [SCNBillboardConstraint(freeAxes: .Y)]
             node.isHidden = true
             node.castsShadow = false
             root.addChildNode(node)
@@ -129,14 +135,16 @@ final class EffectsSystem {
         nextTracer += 1
         node.removeAllActions()
 
-        node.geometry?.firstMaterial = materials.emissiveMaterial(
-            color: UIColor(hex: weapon.tracerColorHex), intensity: isLocalPlayer ? 0.8 : 1.2)
-        node.scale = SCNVector3(1, 1, distance)
+        node.geometry?.firstMaterial = materials.spriteMaterial(
+            .tracerSegment, tint: UIColor(hex: weapon.tracerColorHex))
+        // The quad is 1m tall, so scaling Y by the distance stretches it along the beam.
+        node.scale = SCNVector3(isLocalPlayer ? 0.7 : 1.0, distance, 1)
         let midpoint = from.lerp(to, 0.5)
         node.position = SCNVector3(midpoint.x, midpoint.y, midpoint.z)
-        node.look(at: SCNVector3(to.x, to.y, to.z))
+        node.look(at: SCNVector3(to.x, to.y, to.z), up: SCNVector3(0, 1, 0),
+                  localFront: SCNVector3(0, 1, 0))
         node.isHidden = false
-        node.opacity = 1
+        node.opacity = isLocalPlayer ? 0.75 : 1
 
         node.runAction(.sequence([
             .fadeOpacity(to: 0, duration: isLocalPlayer ? 0.045 : 0.08),
@@ -170,7 +178,7 @@ final class EffectsSystem {
         system.particleColorVariation = SCNVector4(0.05, 0.05, 0.05, 0)
         system.blendMode = surface == .flesh ? .alpha : .additive
         system.isAffectedByGravity = true
-        system.particleImage = nil
+        system.particleImage = materials.spriteImage(surface == .flesh ? .bloodDroplet : .spark)
 
         let node = SCNNode()
         node.position = SCNVector3(position.x, position.y, position.z)
@@ -192,6 +200,7 @@ final class EffectsSystem {
             dust.particleSizeVariation = 0.05
             dust.particleColor = impactColor(for: surface).withAlphaComponent(0.35)
             dust.blendMode = .alpha
+            dust.particleImage = materials.spriteImage(.dustPuff)
             node.addParticleSystem(dust)
         }
     }
@@ -249,6 +258,7 @@ final class EffectsSystem {
         system.particleColor = UIColor(hex: 0xBFE0EA, alpha: 0.85)
         system.isAffectedByGravity = true
         system.blendMode = .alpha
+        system.particleImage = materials.spriteImage(.glowDot)
         let node = SCNNode()
         node.position = SCNVector3(position.x, position.y, position.z)
         node.look(at: SCNVector3(position.x + normal.x, position.y + normal.y, position.z + normal.z))
@@ -271,6 +281,7 @@ final class EffectsSystem {
         system.particleColor = UIColor(hex: 0x8E1519)
         system.isAffectedByGravity = true
         system.blendMode = .alpha
+        system.particleImage = materials.spriteImage(.bloodDroplet)
 
         let node = SCNNode()
         node.position = SCNVector3(position.x, position.y, position.z)
@@ -367,6 +378,7 @@ final class EffectsSystem {
         fire.particleColorVariation = SCNVector4(0.1, 0.1, 0, 0)
         fire.blendMode = .additive
         fire.isAffectedByGravity = false
+        fire.particleImage = materials.spriteImage(.ember)
         node.addParticleSystem(fire)
 
         // Smoke that lingers after the fireball.
@@ -382,6 +394,8 @@ final class EffectsSystem {
         smoke.particleColor = UIColor(white: 0.22, alpha: 0.55)
         smoke.blendMode = .alpha
         smoke.acceleration = SCNVector3(0, 1.1, 0)
+        smoke.particleImage = materials.spriteImage(.smokePuff)
+        smoke.sortingMode = .distance
         node.addParticleSystem(smoke)
 
         // Debris.
@@ -397,6 +411,7 @@ final class EffectsSystem {
             debris.particleSize = 0.03
             debris.particleColor = UIColor(hex: 0x6B6157)
             debris.isAffectedByGravity = true
+            debris.particleImage = materials.spriteImage(.dustPuff)
             node.addParticleSystem(debris)
         }
 
@@ -438,6 +453,11 @@ final class EffectsSystem {
         system.blendMode = .alpha
         system.sortingMode = .distance
         system.acceleration = SCNVector3(0, 0.08, 0)
+        system.particleImage = materials.spriteImage(.smokePuff)
+        // Rotating puffs stop the cloud reading as a cluster of identical billboards.
+        system.particleAngleVariation = 180
+        system.particleAngularVelocity = 12
+        system.particleAngularVelocityVariation = 24
         // Fade the cloud in over the first second so it does not pop.
         system.particleOpacity = 0.9
         node.addParticleSystem(system)
@@ -469,6 +489,9 @@ final class EffectsSystem {
         system.particleColorVariation = SCNVector4(0.08, 0.15, 0, 0)
         system.blendMode = .additive
         system.acceleration = SCNVector3(0, 2.2, 0)
+        system.particleImage = materials.spriteImage(.ember)
+        system.particleAngleVariation = 180
+        system.particleAngularVelocity = 30
         node.addParticleSystem(system)
 
         let light = SCNLight()

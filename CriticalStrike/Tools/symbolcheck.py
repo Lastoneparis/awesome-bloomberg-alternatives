@@ -72,7 +72,9 @@ ALLOWLIST = {
     # Generic parameters, associated types and enclosing-scope names that the regex sees
     # in type position but that are never declarations.
     "Bound", "Element", "T", "Configuration", "Content", "IDs", "Swift",
-    "CFArray", "CheckedContinuation", "NSObject", "UTF8", "WritableKeyPath",
+    "CFArray", "CFData", "CGBitmapInfo", "CGImage", "CGImageAlphaInfo", "CGDataProvider",
+    "CheckedContinuation", "NSObject", "NSNumber", "NSString", "NSAttributedString",
+    "UTF8", "WritableKeyPath", "utsname", "ByteCountFormatter",
     # Seen inside string interpolation, which the stripper deliberately does not parse.
     "GemsCredits", "Foundation",
 }

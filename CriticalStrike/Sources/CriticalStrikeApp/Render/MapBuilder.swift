@@ -93,22 +93,31 @@ enum MapBuilder {
 
     // MARK: - Pieces
 
+    /// Texture density is baked into the mesh's UVs rather than set on the material, so
+    /// every brush of a surface can share one material and still tile correctly — a shared
+    /// material is what lets `flattenedClone` merge the level into a few draw calls.
     private static func node(for brush: MapBrush, materials: MaterialLibrary) -> SCNNode {
-        let size = brush.box.size
-        let box = SCNBox(width: CGFloat(max(size.x, 0.02)),
-                         height: CGFloat(max(size.y, 0.02)),
-                         length: CGFloat(max(size.z, 0.02)),
-                         chamferRadius: 0)
-        let material = materials.material(for: brush.surface)
-        box.firstMaterial = material
-
-        let node = SCNNode(geometry: box)
+        let geometry = GeometryFactory.box(size: brush.box.size,
+                                           metresPerTile: metresPerTile(for: brush.surface))
+        geometry.firstMaterial = materials.material(for: brush.surface)
+        let node = SCNNode(geometry: geometry)
         let center = brush.box.center
         node.position = SCNVector3(center.x, center.y, center.z)
-        // Texture tiling in world units keeps scale consistent across every brush size.
-        node.geometry?.firstMaterial?.diffuse.contentsTransform =
-            SCNMatrix4MakeScale(Float(max(size.x, size.z) / 2), Float(max(size.y, size.z) / 2), 1)
         return node
+    }
+
+    /// How much world space one texture repeat covers. Fine materials tile more often;
+    /// large architectural surfaces tile less so the repetition is not obvious.
+    private static func metresPerTile(for surface: SurfaceKind) -> Float {
+        switch surface {
+        case .concrete, .dirt, .sand, .grass: return 3.0
+        case .metal: return 2.0
+        case .wood: return 2.4
+        case .tile: return 1.6
+        case .fabric: return 1.2
+        case .glass, .water: return 4.0
+        default: return 2.2
+        }
     }
 
     private static func propNode(_ prop: MapProp, materials: MaterialLibrary) -> SCNNode {

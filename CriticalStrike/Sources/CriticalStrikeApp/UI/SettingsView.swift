@@ -4,6 +4,12 @@ import CriticalStrikeCore
 struct SettingsView: View {
     @EnvironmentObject private var app: AppState
     @State private var tab: Tab = .controls
+    @State private var textureCacheBytes: Int64 = TextureLibrary.diskCacheSize()
+
+    private var textureCacheDescription: String {
+        textureCacheBytes < 1024 ? "empty"
+            : ByteCountFormatter.string(fromByteCount: textureCacheBytes, countStyle: .file)
+    }
 
     enum Tab: String, CaseIterable {
         case controls = "Controls"
@@ -35,6 +41,7 @@ struct SettingsView: View {
             }
         }
         .padding(16)
+        .onAppear { textureCacheBytes = TextureLibrary.diskCacheSize() }
     }
 
     // MARK: Controls
@@ -97,6 +104,30 @@ struct SettingsView: View {
                 Text(DeviceCapabilities.summary())
                     .font(Theme.caption(9))
                     .foregroundStyle(Theme.textTertiary)
+            }
+
+            settingGroup("Textures") {
+                Text("""
+                All textures are generated on the device at load time and cached. \
+                Changing the quality preset regenerates them at a new resolution.
+                """)
+                    .font(Theme.caption(10))
+                    .foregroundStyle(Theme.textTertiary)
+                HStack {
+                    Text("Cached textures")
+                        .font(Theme.body(14))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Text(textureCacheDescription)
+                        .font(Theme.mono(12))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Button("Clear Texture Cache") {
+                    TextureLibrary.clearDiskCache()
+                    textureCacheBytes = 0
+                    app.showToast("Textures will regenerate next match", style: .info)
+                }
+                .buttonStyle(SecondaryButtonStyle(wide: true))
             }
 
             settingGroup("Camera") {

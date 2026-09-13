@@ -3,100 +3,162 @@ import SceneKit
 import UIKit
 import CriticalStrikeCore
 
-/// Materials for every surface type.
+/// Builds SceneKit materials from the generated texture sets.
 ///
-/// The game ships without bitmap texture assets: every material is generated once at load
-/// time into a small tiling image with Core Graphics. That keeps the app download tiny,
-/// guarantees the art style is consistent, and means a new surface type is a few lines of
-/// code rather than a texturing job. Materials are cached and shared, so the whole level
-/// draws from a handful of SCNMaterial instances.
+/// The game ships no bitmap art. Every material here is assembled from images that
+/// `TextureLibrary` synthesised at load time: albedo, tangent-space normal, roughness,
+/// ambient occlusion, metalness and emission. Because all six maps derive from one shared
+/// height field per surface, the lighting agrees with the visible detail — which is what
+/// separates a procedural material from noise with a bump map bolted on.
 final class MaterialLibrary {
+    private let textures: TextureLibrary
     private var cache: [String: SCNMaterial] = [:]
-    private var textureCache: [String: UIImage] = [:]
     private let quality: GraphicsQuality
 
-    init(quality: GraphicsQuality) {
-        self.quality = quality
+    init(textures: TextureLibrary) {
+        self.textures = textures
+        self.quality = textures.quality
     }
 
-    // MARK: - Public API
+    // MARK: - World surfaces
 
     func material(for surface: SurfaceKind, tintOverride: UIColor? = nil) -> SCNMaterial {
         let key = "surface_\(surface.rawValue)_\(tintOverride?.description ?? "-")"
         if let cached = cache[key] { return cached }
 
+        let set = textures.surfaceTextures(surface)
         let material = SCNMaterial()
         material.lightingModel = .physicallyBased
-        let spec = MaterialLibrary.spec(for: surface)
-        let baseColor = tintOverride ?? spec.color
+        material.name = key
 
-        material.diffuse.contents = texture(named: key, size: textureSize,
-                                            generator: { context, size in
-            MaterialLibrary.drawSurface(surface, color: baseColor, in: context, size: size)
-        })
-        material.diffuse.wrapS = .repeat
-        material.diffuse.wrapT = .repeat
-        material.roughness.contents = NSNumber(value: spec.roughness)
-        material.metalness.contents = NSNumber(value: spec.metalness)
-        material.isDoubleSided = false
+        material.diffuse.contents = set.albedo
+        if let tintOverride {
+            // Multiplying keeps the generated detail and only shifts the hue.
+            material.multiply.contents = tintOverride
+        }
+        apply(set: set, to: material, defaultRoughness: defaultRoughness(for: surface),
+              defaultMetalness: defaultMetalness(for: surface))
+        configureSampling(material)
 
-        if surface == .glass {
-            material.transparency = 0.28
+        switch surface {
+        case .glass:
+            material.transparency = 0.34
             material.transparencyMode = .dualLayer
             material.blendMode = .alpha
             material.writesToDepthBuffer = false
+            material.isDoubleSided = true
+        case .water:
+            material.transparency = 0.72
+            material.blendMode = .alpha
+            material.isDoubleSided = true
+        case .flesh:
+            // A little forward scatter stops skin reading as painted plastic.
+            material.emission.contents = UIColor(red: 0.18, green: 0.04, blue: 0.04, alpha: 1)
+            material.emission.intensity = 0.12
+        default:
+            break
         }
-        if surface == .water {
-            material.transparency = 0.55
-            material.roughness.contents = NSNumber(value: 0.08)
-        }
-        // Normal detail only where it will actually be seen.
-        if quality != .low {
-            material.normal.contents = texture(named: key + "_n", size: textureSize) { context, size in
-                MaterialLibrary.drawNormalNoise(in: context, size: size, strength: spec.normalStrength)
-            }
-            material.normal.wrapS = .repeat
-            material.normal.wrapT = .repeat
-            material.normal.intensity = 0.7
-        }
+
         cache[key] = material
         return material
     }
 
-    /// Team-tinted material for character models.
+    /// Materials are shared, so per-brush texture scale is applied to the node's geometry
+    /// rather than here. This returns the repeat count that keeps texel density constant.
+    static func textureScale(forSize size: Vec3, metresPerTile: Float = 2.5) -> (Float, Float) {
+        let width = max(max(size.x, size.z), 0.1)
+        let height = max(size.y, 0.1)
+        return (width / metresPerTile, height / metresPerTile)
+    }
+
+    private func defaultRoughness(for surface: SurfaceKind) -> Float {
+        switch surface {
+        case .metal: return 0.35
+        case .glass: return 0.05
+        case .water: return 0.06
+        case .tile: return 0.25
+        case .plastic: return 0.5
+        case .flesh: return 0.65
+        default: return 0.9
+        }
+    }
+
+    private func defaultMetalness(for surface: SurfaceKind) -> Float {
+        switch surface {
+        case .metal: return 0.9
+        case .tile: return 0.05
+        default: return 0
+        }
+    }
+
+    // MARK: - Weapons
+
+    func weaponMaterial(build: WeaponBuild) -> SCNMaterial {
+        let cosmetic = build.skin.flatMap(CosmeticDatabase.cosmetic)
+        return weaponMaterial(skin: cosmetic)
+    }
+
+    func weaponMaterial(skin: CosmeticData?) -> SCNMaterial {
+        let pattern = SkinPattern.pattern(for: skin)
+        let tint = RGB(hex: skin?.tintHex ?? 0x2E3238)
+        let key = "weapon_\(pattern.rawValue)_\(skin?.id.value ?? "default")"
+        if let cached = cache[key] { return cached }
+
+        let set = textures.skinTextures(pattern: pattern, tint: tint)
+        let material = SCNMaterial()
+        material.lightingModel = .physicallyBased
+        material.name = key
+        material.diffuse.contents = set.albedo
+        apply(set: set, to: material,
+              defaultRoughness: pattern.isMetal ? 0.25 : 0.55,
+              defaultMetalness: pattern.isMetal ? 0.9 : 0.1)
+        configureSampling(material, repeats: false)
+
+        if pattern.isEmissive, let emission = set.emission {
+            material.emission.contents = emission
+            material.emission.intensity = skin?.rarity == .mythic ? 1.4 : 1.0
+        }
+        if pattern == .phantomGlass {
+            material.transparency = 0.8
+            material.blendMode = .alpha
+        }
+
+        cache[key] = material
+        return material
+    }
+
+    // MARK: - Characters
+
+    /// Operator fatigues: the same camo generator as weapon skins, tinted to the team so
+    /// the two sides are readable at a glance without flat colour blocks.
     func characterMaterial(team: Team, colorBlind: ColorBlindMode, accent: Bool = false) -> SCNMaterial {
         let key = "char_\(team.rawValue)_\(colorBlind.rawValue)_\(accent)"
         if let cached = cache[key] { return cached }
+
+        let teamColor = RGB(hex: colorBlind.teamColor(team))
         let material = SCNMaterial()
         material.lightingModel = .physicallyBased
-        let hex = colorBlind.teamColor(team)
-        let base = UIColor(hex: hex)
-        material.diffuse.contents = accent ? base : base.darkened(by: 0.55)
-        material.roughness.contents = NSNumber(value: 0.65)
-        material.metalness.contents = NSNumber(value: 0.1)
-        material.emission.contents = accent ? base.withAlphaComponent(0.35) : UIColor.black
+        material.name = key
+
+        if accent {
+            // Webbing and chest rig: flat team colour, slightly emissive so it reads in
+            // shadow, which is where most of a firefight happens.
+            material.diffuse.contents = teamColor.uiColor
+            material.emission.contents = teamColor.scaled(0.35).uiColor
+            material.roughness.contents = NSNumber(value: 0.55)
+            material.metalness.contents = NSNumber(value: 0.15)
+        } else {
+            let set = textures.skinTextures(pattern: .urbanCamo, tint: teamColor.scaled(0.55))
+            material.diffuse.contents = set.albedo
+            apply(set: set, to: material, defaultRoughness: 0.85, defaultMetalness: 0)
+            configureSampling(material, repeats: false)
+        }
+
         cache[key] = material
         return material
     }
 
-    /// Weapon material, optionally tinted by an equipped skin.
-    func weaponMaterial(skin: CosmeticData?) -> SCNMaterial {
-        let key = "weapon_\(skin?.id.value ?? "default")"
-        if let cached = cache[key] { return cached }
-        let material = SCNMaterial()
-        material.lightingModel = .physicallyBased
-        let tint = skin.map { UIColor(hex: $0.tintHex) } ?? UIColor(white: 0.18, alpha: 1)
-        material.diffuse.contents = texture(named: key, size: textureSize) { context, size in
-            MaterialLibrary.drawGunmetal(color: tint, in: context, size: size)
-        }
-        material.roughness.contents = NSNumber(value: skin?.rarity == .legendary ? 0.25 : 0.45)
-        material.metalness.contents = NSNumber(value: 0.85)
-        if skin?.hasAnimatedShader == true {
-            material.emission.contents = tint.withAlphaComponent(0.3)
-        }
-        cache[key] = material
-        return material
-    }
+    // MARK: - Effects
 
     func emissiveMaterial(color: UIColor, intensity: CGFloat = 1) -> SCNMaterial {
         let key = "emissive_\(color.description)_\(intensity)"
@@ -111,206 +173,92 @@ final class MaterialLibrary {
         return material
     }
 
+    /// Bullet holes and splatter. The decal image already carries its own alpha shape, so
+    /// the material only has to stay out of the depth buffer's way.
     func decalMaterial(surface: SurfaceKind) -> SCNMaterial {
-        let key = "decal_\(surface.rawValue)"
+        let kind = DecalKind.forSurface(surface)
+        let key = "decal_\(kind.rawValue)"
         if let cached = cache[key] { return cached }
+
         let material = SCNMaterial()
         material.lightingModel = .constant
-        material.diffuse.contents = texture(named: key, size: 64) { context, size in
-            MaterialLibrary.drawBulletHole(in: context, size: size)
-        }
+        material.diffuse.contents = textures.decal(kind)
         material.blendMode = .alpha
         material.writesToDepthBuffer = false
         material.readsFromDepthBuffer = true
+        material.diffuse.mipFilter = .linear
+        // Decals sit a few millimetres off the wall; a small bias avoids z-fighting on
+        // devices with a shallower depth buffer.
+        material.shaderModifiers = nil
         cache[key] = material
         return material
     }
 
-    // MARK: - Texture generation
+    func spriteImage(_ kind: SpriteKind) -> UIImage? {
+        textures.sprite(kind)
+    }
 
-    private var textureSize: CGFloat {
-        switch quality {
-        case .low: return 128
-        case .medium: return 256
-        case .high, .ultra: return 512
+    /// A billboard material for a generated sprite. Additive for anything hot (muzzle
+    /// flashes, tracers, sparks); alpha for anything that occludes (smoke, blood).
+    func spriteMaterial(_ kind: SpriteKind, tint: UIColor, additive: Bool = true) -> SCNMaterial {
+        let key = "sprite_\(kind.rawValue)_\(tint.description)_\(additive)"
+        if let cached = cache[key] { return cached }
+        let material = SCNMaterial()
+        material.lightingModel = .constant
+        material.diffuse.contents = textures.sprite(kind)
+        material.multiply.contents = tint
+        material.blendMode = additive ? .add : .alpha
+        material.writesToDepthBuffer = false
+        material.readsFromDepthBuffer = true
+        material.isDoubleSided = true
+        material.diffuse.mipFilter = .linear
+        cache[key] = material
+        return material
+    }
+
+    func skyCubeMap(for environment: MapEnvironment) -> [UIImage] {
+        textures.skyCubeMap(for: environment)
+    }
+
+    // MARK: - Shared setup
+
+    private func apply(set: TextureSet, to material: SCNMaterial,
+                       defaultRoughness: Float, defaultMetalness: Float) {
+        if let normal = set.normal, quality != .low {
+            material.normal.contents = normal
+            material.normal.intensity = quality == .ultra ? 1.0 : 0.8
+        }
+        if let roughness = set.roughness {
+            material.roughness.contents = roughness
+        } else {
+            material.roughness.contents = NSNumber(value: defaultRoughness)
+        }
+        if let metalness = set.metalness {
+            material.metalness.contents = metalness
+        } else {
+            material.metalness.contents = NSNumber(value: defaultMetalness)
+        }
+        // Baked occlusion only affects ambient light, so it deepens crevices without
+        // fighting the dynamic lights.
+        if let occlusion = set.occlusion, quality != .low {
+            material.ambientOcclusion.contents = occlusion
         }
     }
 
-    private func texture(named key: String, size: CGFloat,
-                         generator: (CGContext, CGFloat) -> Void) -> UIImage {
-        if let cached = textureCache[key] { return cached }
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
-        let image = renderer.image { ctx in
-            generator(ctx.cgContext, size)
-        }
-        textureCache[key] = image
-        return image
-    }
-
-    private struct SurfaceSpec {
-        var color: UIColor
-        var roughness: Float
-        var metalness: Float
-        var normalStrength: CGFloat
-    }
-
-    private static func spec(for surface: SurfaceKind) -> SurfaceSpec {
-        switch surface {
-        case .concrete: return SurfaceSpec(color: UIColor(hex: 0x8C8880), roughness: 0.85, metalness: 0.0, normalStrength: 0.5)
-        case .metal:    return SurfaceSpec(color: UIColor(hex: 0x6E7681), roughness: 0.35, metalness: 0.9, normalStrength: 0.35)
-        case .wood:     return SurfaceSpec(color: UIColor(hex: 0x8A6238), roughness: 0.75, metalness: 0.0, normalStrength: 0.6)
-        case .dirt:     return SurfaceSpec(color: UIColor(hex: 0x6B563C), roughness: 0.95, metalness: 0.0, normalStrength: 0.8)
-        case .sand:     return SurfaceSpec(color: UIColor(hex: 0xC8AE7D), roughness: 0.92, metalness: 0.0, normalStrength: 0.7)
-        case .grass:    return SurfaceSpec(color: UIColor(hex: 0x4C6B3A), roughness: 0.95, metalness: 0.0, normalStrength: 0.9)
-        case .water:    return SurfaceSpec(color: UIColor(hex: 0x2E5A72), roughness: 0.08, metalness: 0.2, normalStrength: 0.3)
-        case .glass:    return SurfaceSpec(color: UIColor(hex: 0xBFE0EA), roughness: 0.05, metalness: 0.1, normalStrength: 0.1)
-        case .fabric:   return SurfaceSpec(color: UIColor(hex: 0x7A5A4A), roughness: 0.98, metalness: 0.0, normalStrength: 0.5)
-        case .flesh:    return SurfaceSpec(color: UIColor(hex: 0x9B5A52), roughness: 0.7, metalness: 0.0, normalStrength: 0.3)
-        case .plastic:  return SurfaceSpec(color: UIColor(hex: 0x9AA3AB), roughness: 0.5, metalness: 0.0, normalStrength: 0.2)
-        case .tile:     return SurfaceSpec(color: UIColor(hex: 0xADB4BC), roughness: 0.3, metalness: 0.05, normalStrength: 0.25)
-        }
-    }
-
-    private static func drawSurface(_ surface: SurfaceKind, color: UIColor,
-                                    in context: CGContext, size: CGFloat) {
-        context.setFillColor(color.cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
-
-        var generator = SystemRandomNumberGenerator()
-        func random(_ range: ClosedRange<CGFloat>) -> CGFloat {
-            CGFloat.random(in: range, using: &generator)
-        }
-
-        switch surface {
-        case .concrete, .sand, .dirt, .plastic, .flesh:
-            // Fine speckle.
-            for _ in 0..<Int(size * 1.6) {
-                let shade = random(-0.09...0.09)
-                context.setFillColor(color.adjusted(brightness: shade).cgColor)
-                let s = random(1...3)
-                context.fill(CGRect(x: random(0...size), y: random(0...size), width: s, height: s))
+    private func configureSampling(_ material: SCNMaterial, repeats: Bool = true) {
+        for property in [material.diffuse, material.normal, material.roughness,
+                         material.metalness, material.ambientOcclusion, material.emission,
+                         material.multiply] {
+            if repeats {
+                property.wrapS = .repeat
+                property.wrapT = .repeat
             }
-        case .metal:
-            // Brushed streaks plus panel lines.
-            for _ in 0..<Int(size / 2) {
-                let shade = random(-0.12...0.12)
-                context.setFillColor(color.adjusted(brightness: shade).cgColor)
-                let y = random(0...size)
-                context.fill(CGRect(x: 0, y: y, width: size, height: random(0.5...1.5)))
-            }
-            context.setStrokeColor(color.adjusted(brightness: -0.3).cgColor)
-            context.setLineWidth(2)
-            context.stroke(CGRect(x: 1, y: 1, width: size - 2, height: size - 2))
-        case .wood:
-            for _ in 0..<Int(size / 6) {
-                context.setStrokeColor(color.adjusted(brightness: random(-0.18...0.05)).cgColor)
-                context.setLineWidth(random(1...4))
-                let y = random(0...size)
-                context.move(to: CGPoint(x: 0, y: y))
-                context.addCurve(to: CGPoint(x: size, y: y + random(-6...6)),
-                                 control1: CGPoint(x: size * 0.33, y: y + random(-8...8)),
-                                 control2: CGPoint(x: size * 0.66, y: y + random(-8...8)))
-                context.strokePath()
-            }
-        case .grass:
-            for _ in 0..<Int(size * 2) {
-                context.setStrokeColor(color.adjusted(brightness: random(-0.15...0.2)).cgColor)
-                context.setLineWidth(1)
-                let x = random(0...size), y = random(0...size)
-                context.move(to: CGPoint(x: x, y: y))
-                context.addLine(to: CGPoint(x: x + random(-2...2), y: y - random(2...6)))
-                context.strokePath()
-            }
-        case .tile:
-            let cell = size / 4
-            context.setStrokeColor(color.adjusted(brightness: -0.35).cgColor)
-            context.setLineWidth(2)
-            for i in 0...4 {
-                let p = CGFloat(i) * cell
-                context.move(to: CGPoint(x: p, y: 0)); context.addLine(to: CGPoint(x: p, y: size))
-                context.move(to: CGPoint(x: 0, y: p)); context.addLine(to: CGPoint(x: size, y: p))
-            }
-            context.strokePath()
-        case .glass, .water:
-            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                      colors: [color.adjusted(brightness: 0.2).cgColor,
-                                               color.adjusted(brightness: -0.15).cgColor] as CFArray,
-                                      locations: [0, 1])
-            if let gradient {
-                context.drawLinearGradient(gradient, start: .zero,
-                                           end: CGPoint(x: size, y: size), options: [])
-            }
-        case .fabric:
-            for i in stride(from: CGFloat(0), to: size, by: 3) {
-                context.setStrokeColor(color.adjusted(brightness: random(-0.08...0.08)).cgColor)
-                context.setLineWidth(1)
-                context.move(to: CGPoint(x: i, y: 0)); context.addLine(to: CGPoint(x: i, y: size))
-                context.move(to: CGPoint(x: 0, y: i)); context.addLine(to: CGPoint(x: size, y: i))
-                context.strokePath()
-            }
-        }
-    }
-
-    private static func drawNormalNoise(in context: CGContext, size: CGFloat, strength: CGFloat) {
-        // Flat normal is (0.5, 0.5, 1.0) in tangent space.
-        context.setFillColor(UIColor(red: 0.5, green: 0.5, blue: 1, alpha: 1).cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
-        var generator = SystemRandomNumberGenerator()
-        for _ in 0..<Int(size * strength * 3) {
-            let dx = CGFloat.random(in: -0.2...0.2, using: &generator) * strength
-            let dy = CGFloat.random(in: -0.2...0.2, using: &generator) * strength
-            context.setFillColor(UIColor(red: 0.5 + dx, green: 0.5 + dy, blue: 1, alpha: 1).cgColor)
-            let s = CGFloat.random(in: 1...3, using: &generator)
-            context.fill(CGRect(x: CGFloat.random(in: 0...size, using: &generator),
-                                y: CGFloat.random(in: 0...size, using: &generator),
-                                width: s, height: s))
-        }
-    }
-
-    private static func drawGunmetal(color: UIColor, in context: CGContext, size: CGFloat) {
-        context.setFillColor(color.cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
-        var generator = SystemRandomNumberGenerator()
-        for _ in 0..<Int(size) {
-            let shade = CGFloat.random(in: -0.1...0.1, using: &generator)
-            context.setFillColor(color.adjusted(brightness: shade).cgColor)
-            let y = CGFloat.random(in: 0...size, using: &generator)
-            context.fill(CGRect(x: 0, y: y, width: size, height: 1))
-        }
-        // Faint hex pattern reads as a modern weapon finish at viewmodel distance.
-        context.setStrokeColor(color.adjusted(brightness: 0.12).cgColor)
-        context.setLineWidth(1)
-        let step = size / 8
-        for row in 0..<8 {
-            for col in 0..<8 {
-                let x = CGFloat(col) * step + (row % 2 == 0 ? 0 : step / 2)
-                let y = CGFloat(row) * step
-                context.strokeEllipse(in: CGRect(x: x, y: y, width: step * 0.6, height: step * 0.6))
-            }
-        }
-    }
-
-    private static func drawBulletHole(in context: CGContext, size: CGFloat) {
-        context.clear(CGRect(x: 0, y: 0, width: size, height: size))
-        let center = CGPoint(x: size / 2, y: size / 2)
-        // Dark core with a lighter ring of displaced material.
-        context.setFillColor(UIColor(white: 0.05, alpha: 0.95).cgColor)
-        context.fillEllipse(in: CGRect(x: center.x - size * 0.16, y: center.y - size * 0.16,
-                                       width: size * 0.32, height: size * 0.32))
-        context.setStrokeColor(UIColor(white: 0.75, alpha: 0.35).cgColor)
-        context.setLineWidth(size * 0.05)
-        context.strokeEllipse(in: CGRect(x: center.x - size * 0.22, y: center.y - size * 0.22,
-                                         width: size * 0.44, height: size * 0.44))
-        var generator = SystemRandomNumberGenerator()
-        for _ in 0..<10 {
-            context.setStrokeColor(UIColor(white: 0.1, alpha: 0.5).cgColor)
-            context.setLineWidth(CGFloat.random(in: 0.5...1.5, using: &generator))
-            let angle = CGFloat.random(in: 0...(2 * .pi), using: &generator)
-            let length = CGFloat.random(in: size * 0.18...size * 0.42, using: &generator)
-            context.move(to: center)
-            context.addLine(to: CGPoint(x: center.x + cos(angle) * length,
-                                        y: center.y + sin(angle) * length))
-            context.strokePath()
+            property.mipFilter = .linear
+            property.minificationFilter = .linear
+            property.magnificationFilter = .linear
+            // Anisotropy is what keeps a floor from turning to mush at grazing angles —
+            // by far the best quality-per-millisecond setting on a mobile GPU.
+            property.maxAnisotropy = quality == .low ? 1 : (quality == .ultra ? 8 : 4)
         }
     }
 }
