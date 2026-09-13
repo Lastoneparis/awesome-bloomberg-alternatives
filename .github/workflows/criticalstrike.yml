@@ -10,6 +10,12 @@ on:
       - 'CriticalStrike/**'
       - '.github/workflows/criticalstrike.yml'
 
+# A push supersedes the run before it. Without this, a burst of fixes leaves a queue of
+# runs against commits nobody cares about, all competing for the same macOS runners.
+concurrency:
+  group: criticalstrike-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static-checks:
     name: Static checks
@@ -28,6 +34,9 @@ jobs:
   build-and-test:
     name: Build and test the core
     runs-on: macos-14
+    # The simulation and the audio synthesis both run unoptimised here. If something hangs
+    # it should fail in twenty minutes, not sit on a runner until the six-hour default.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode
@@ -45,6 +54,7 @@ jobs:
     # writes pbxproj object version 77, which Xcode 15.4 refuses to open outright, and
     # XcodeGen has no option to write an older format.
     runs-on: macos-15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Show the toolchain
