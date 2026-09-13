@@ -44,16 +44,16 @@ This file is the checklist the build loop works through. Anything unchecked is n
 - [x] Anti-cheat sanity validation
 
 ## Phase 6 — Economy & progression
-- [ ] Currencies, store catalog, bundles
-- [ ] Loot crates with published odds + pity timer
-- [ ] Battle pass (free/premium tracks, tiers, rewards)
-- [ ] Missions (daily/weekly/career)
-- [ ] XP curve, ranks, unlocks, prestige
-- [ ] Player stats tracking
+- [x] Currencies, store catalog, bundles
+- [x] Loot crates with published odds + pity timer
+- [x] Battle pass (free/premium tracks, tiers, rewards)
+- [x] Missions (daily/weekly/career)
+- [x] XP curve, ranks, unlocks, prestige
+- [x] Player stats tracking
 
 ## Phase 7 — Persistence
-- [ ] Player profile model + atomic save store
-- [ ] Settings model (graphics, audio, controls, HUD layout)
+- [x] Player profile model + atomic save store
+- [x] Settings model (graphics, audio, controls, HUD layout)
 
 ## Phase 8 — iOS app layer
 - [ ] App entry, routing, coordinator, lifecycle

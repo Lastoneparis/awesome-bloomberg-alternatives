@@ -14,9 +14,11 @@ from collections import defaultdict
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_DIRS = [os.path.join(ROOT, "Sources"), os.path.join(ROOT, "Tests")]
 
+# Only top-level declarations (column 0) are checked for duplicates; nested types
+# such as a per-type private CodingKeys legitimately repeat.
 DECL_RE = re.compile(
-    r'^\s*(?:public |internal |private |fileprivate |open |final |@objc |@MainActor |)*'
-    r'(?:final\s+)?(class|struct|enum|protocol|actor|extension|typealias)\s+([A-Za-z_][A-Za-z0-9_]*)')
+    r'^(?:public |internal |private |fileprivate |open |final |@objc |@MainActor )*'
+    r'(class|struct|enum|protocol|actor|extension|typealias)\s+([A-Za-z_][A-Za-z0-9_]*)')
 
 def strip_noise(text):
     """Remove string literals and comments so delimiter counting is meaningful."""
