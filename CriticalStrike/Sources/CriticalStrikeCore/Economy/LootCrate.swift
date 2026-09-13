@@ -27,11 +27,17 @@ public struct LootCrate: Identifiable, Codable, Sendable {
     }
 
     /// Published odds for this crate, as percentages summing to 100.
-    public func publishedOdds() -> [(rarity: Rarity, percent: Double)] {
+    public func publishedOdds() -> [RarityOdds] {
         let rarities = Rarity.allCases.filter { $0 >= guaranteedMinimumRarity }
         let total = rarities.reduce(Double(0)) { $0 + Double($1.dropWeight) }
-        return rarities.map { ($0, Double($0.dropWeight) / total * 100) }
+        return rarities.map { RarityOdds(rarity: $0, percent: Double($0.dropWeight) / total * 100) }
     }
+}
+
+public struct RarityOdds: Identifiable, Sendable {
+    public var id: Int { rarity.rawValue }
+    public let rarity: Rarity
+    public let percent: Double
 }
 
 public struct CrateReward: Sendable {

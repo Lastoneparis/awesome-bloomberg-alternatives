@@ -27,7 +27,8 @@ struct LoadoutView: View {
     private var classSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(Array(profile.loadouts.enumerated()), id: \.element.id) { index, entry in
+                ForEach(profile.loadouts.indices, id: \.self) { index in
+                    let entry = profile.loadouts[index]
                     Button {
                         app.selectLoadout(index)
                     } label: {
@@ -196,9 +197,9 @@ struct LoadoutView: View {
             }
 
             VStack(spacing: 5) {
-                ForEach(Array(weapon.statBars.asPairs.enumerated()), id: \.offset) { _, pair in
-                    StatBarRow(label: pair.0, value: pair.1,
-                               comparison: baseValue(for: pair.0, weapon: base))
+                ForEach(weapon.statBars.stats) { stat in
+                    StatBarRow(label: stat.name, value: stat.value,
+                               comparison: base.statBars.value(named: stat.name))
                 }
             }
 
@@ -225,10 +226,6 @@ struct LoadoutView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .panel()
-    }
-
-    private func baseValue(for label: String, weapon: WeaponData) -> Float {
-        weapon.statBars.asPairs.first { $0.0 == label }?.1 ?? 0
     }
 
     private func attachmentRow(slot: AttachmentSlot, build: WeaponBuild) -> some View {
@@ -331,8 +328,8 @@ struct ArmoryView: View {
                 miniStat("TTK", String(format: "%.2fs", DamageModel.timeToKill(weapon: weapon)))
                 miniStat("MAG", "\(weapon.magazineSize)")
             }
-            ForEach(Array(weapon.statBars.asPairs.prefix(3).enumerated()), id: \.offset) { _, pair in
-                StatBarRow(label: pair.0, value: pair.1)
+            ForEach(weapon.statBars.stats.prefix(3)) { stat in
+                StatBarRow(label: stat.name, value: stat.value)
             }
             if owned {
                 Button("Equip") {

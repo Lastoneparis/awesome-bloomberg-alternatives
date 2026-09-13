@@ -18,6 +18,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Swift sources
         run: python3 CriticalStrike/Tools/validate.py
+      - name: Resolve cross-file symbols
+        run: python3 CriticalStrike/Tools/symbolcheck.py
+      - name: Check initializer argument order
+        run: python3 CriticalStrike/Tools/argorder.py
 
   build-and-test:
     name: Build and test the core

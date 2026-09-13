@@ -19,6 +19,10 @@ final class GameRenderer: NSObject {
     private let worldRoot = SCNNode()
     private let dynamicRoot = SCNNode()
     private var characters: [PlayerID: CharacterNode] = [:]
+    /// What each player is currently holding, so a weapon model is built once on change
+    /// rather than every frame.
+    private var equippedWeapon: [PlayerID: WeaponID] = [:]
+    private var weaponModelTemplates: [String: SCNNode] = [:]
     private var pickupNodes: [EntityID: SCNNode] = [:]
     private var objectiveNodes: [Int: SCNNode] = [:]
     private var spawnMarkers: SCNNode?
@@ -241,19 +245,44 @@ final class GameRenderer: NSObject {
                 return created
             }()
 
-            let weaponModel = weaponBuilds[player.id].map { build in
-                WeaponViewModel.buildModel(for: build.resolved(), materials: materials,
-                                           skin: build.skin.flatMap(CosmeticDatabase.cosmetic))
+            var newWeaponModel: SCNNode?
+            if equippedWeapon[player.id] != player.weapon {
+                equippedWeapon[player.id] = player.weapon
+                let build = weaponBuilds[player.id] ?? WeaponBuild(weapon: player.weapon)
+                newWeaponModel = makeWeaponModel(for: build)
             }
             node.apply(snapshot: player, localTeam: localTeam, deltaTime: deltaTime,
-                       weaponModel: weaponModel)
+                       weaponModel: newWeaponModel)
         }
 
         // Retire characters for players who left.
         for (id, node) in characters where !seen.contains(id) {
             node.remove()
             characters[id] = nil
+            equippedWeapon[id] = nil
         }
+    }
+
+    /// Weapon models are built once per unique build and cloned thereafter: a firefight
+    /// with ten players would otherwise rebuild ten meshes every frame.
+    private func makeWeaponModel(for build: WeaponBuild) -> SCNNode {
+        let key = build.weapon.value + "|" + build.normalizedAttachments.map(\.value).joined(separator: ",")
+            + "|" + (build.skin?.value ?? "")
+        if let template = weaponModelTemplates[key] {
+            let clone = template.clone()
+            clone.name = template.name
+            return clone
+        }
+        let model = WeaponViewModel.buildModel(for: build.resolved(), materials: materials,
+                                               skin: build.skin.flatMap(CosmeticDatabase.cosmetic))
+        for attachment in WeaponViewModel.attachmentNodes(for: build, materials: materials) {
+            model.addChildNode(attachment)
+        }
+        model.name = key
+        weaponModelTemplates[key] = model
+        let clone = model.clone()
+        clone.name = key
+        return clone
     }
 
     func playerDied(_ id: PlayerID, impulse: Vec3) {
@@ -381,6 +410,7 @@ final class GameRenderer: NSObject {
         characters.removeAll()
         for (_, node) in pickupNodes { node.removeFromParentNode() }
         pickupNodes.removeAll()
+        equippedWeapon.removeAll()
         effects.reset()
     }
 }

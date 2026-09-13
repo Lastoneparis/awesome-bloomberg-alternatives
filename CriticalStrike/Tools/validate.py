@@ -94,6 +94,12 @@ def main():
         if '\t' in raw:
             warnings.append(f"{rel}: contains tab characters")
 
+        # Swift has no key paths into tuple elements, so `id: \.0` or `id: \.offset` on an
+        # enumerated sequence does not compile even though it reads like idiomatic SwiftUI.
+        for match in re.finditer(r'id:\s*\\\.(?:\d+|offset\b|element\.)', code):
+            lineno = code[:match.start()].count('\n') + 1
+            errors.append(f"{rel}:{lineno}: key path into a tuple element is not valid Swift")
+
         for lineno, line in enumerate(raw.split('\n'), 1):
             match = DECL_RE.match(line)
             if match and match.group(1) != 'extension':

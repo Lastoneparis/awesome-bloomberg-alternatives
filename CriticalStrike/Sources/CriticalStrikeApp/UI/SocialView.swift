@@ -230,7 +230,8 @@ struct PingWheelView: View {
             Color.black.opacity(0.35).ignoresSafeArea()
                 .onTapGesture { onDismiss() }
 
-            ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
                 let angle = Double(index) / Double(options.count) * 2 * .pi - .pi / 2
                 let radius: CGFloat = 96
                 Button {

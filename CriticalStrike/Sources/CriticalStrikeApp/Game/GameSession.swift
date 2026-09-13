@@ -464,10 +464,10 @@ final class GameSession: NSObject, ObservableObject {
                 }
             }
 
-        case let .weaponSwitched(player, weaponID, _):
+        case let .weaponSwitched(player, weaponID, slot):
             guard player == localPlayerID else { return }
-            var build = weaponBuilds[player] ?? WeaponBuild(weapon: weaponID)
-            if build.weapon != weaponID { build = WeaponBuild(weapon: weaponID) }
+            // Take the build from the simulation so attachments and skins survive a swap.
+            let build = sim.player(player)?.slots[slot]?.build ?? WeaponBuild(weapon: weaponID)
             weaponBuilds[player] = build
             gameRenderer.viewModel.equip(build: build,
                                      skin: build.skin.flatMap(CosmeticDatabase.cosmetic))

@@ -148,7 +148,7 @@ struct StoreView: View {
 
                     // Published odds, exactly as implemented.
                     HStack(spacing: 10) {
-                        ForEach(crate.publishedOdds(), id: \.rarity) { entry in
+                        ForEach(crate.publishedOdds()) { entry in
                             VStack(spacing: 1) {
                                 Text(String(format: "%.2f%%", entry.percent))
                                     .font(Theme.mono(10))
@@ -348,7 +348,8 @@ struct CrateOpeningView: View {
                     .foregroundStyle(Theme.textPrimary)
 
                 HStack(spacing: 12) {
-                    ForEach(Array(rewards.enumerated()), id: \.offset) { index, reward in
+                    ForEach(rewards.indices, id: \.self) { index in
+                        let reward = rewards[index]
                         let cosmetic = CosmeticDatabase.cosmetic(reward.cosmetic)
                         VStack(spacing: 6) {
                             RoundedRectangle(cornerRadius: 10)

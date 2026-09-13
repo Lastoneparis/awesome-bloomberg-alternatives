@@ -93,15 +93,15 @@ struct ProfileView: View {
             Text("WEAPON PROGRESSION")
                 .font(Theme.caption(10))
                 .foregroundStyle(Theme.textTertiary)
-            ForEach(topWeapons, id: \.0) { weaponID, kills in
-                let weapon = WeaponDatabase.weaponOrDefault(weaponID)
+            ForEach(topWeapons) { entry in
+                let weapon = WeaponDatabase.weaponOrDefault(entry.weapon)
                 HStack {
                     Text(weapon.name).font(Theme.body(13)).foregroundStyle(Theme.textPrimary)
                     Spacer()
-                    Text("Lv \(profile.unlocks.weaponLevel(weaponID))")
+                    Text("Lv \(profile.unlocks.weaponLevel(entry.weapon))")
                         .font(Theme.caption(10))
                         .foregroundStyle(Theme.textSecondary)
-                    Text("\(kills) kills")
+                    Text("\(entry.kills) kills")
                         .font(Theme.mono(12))
                         .foregroundStyle(Theme.textTertiary)
                         .frame(width: 78, alignment: .trailing)
@@ -118,11 +118,17 @@ struct ProfileView: View {
         .panel()
     }
 
-    private var topWeapons: [(WeaponID, Int)] {
+    private struct WeaponUsage: Identifiable {
+        var id: String { weapon.value }
+        let weapon: WeaponID
+        let kills: Int
+    }
+
+    private var topWeapons: [WeaponUsage] {
         profile.unlocks.weaponKills
             .sorted { $0.value > $1.value }
             .prefix(6)
-            .map { (WeaponID($0.key), $0.value) }
+            .map { WeaponUsage(weapon: WeaponID($0.key), kills: $0.value) }
     }
 
     private var prestigeCard: some View {

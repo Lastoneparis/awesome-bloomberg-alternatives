@@ -250,10 +250,26 @@ public struct WeaponData: Codable, Identifiable, Sendable {
 
 public struct WeaponStatBars: Sendable {
     public let damage, fireRate, range, accuracy, mobility, control: Float
-    public var asPairs: [(String, Float)] {
-        [("Damage", damage), ("Fire Rate", fireRate), ("Range", range),
-         ("Accuracy", accuracy), ("Mobility", mobility), ("Control", control)]
+
+    /// Identifiable rather than a tuple so the loadout UI can drive a `ForEach` directly.
+    public var stats: [WeaponStat] {
+        [WeaponStat(name: "Damage", value: damage),
+         WeaponStat(name: "Fire Rate", value: fireRate),
+         WeaponStat(name: "Range", value: range),
+         WeaponStat(name: "Accuracy", value: accuracy),
+         WeaponStat(name: "Mobility", value: mobility),
+         WeaponStat(name: "Control", value: control)]
     }
+
+    public func value(named name: String) -> Float {
+        stats.first { $0.name == name }?.value ?? 0
+    }
+}
+
+public struct WeaponStat: Identifiable, Sendable {
+    public var id: String { name }
+    public let name: String
+    public let value: Float
 }
 
 /// One entry of a learnable spray pattern, in radians relative to the aim point.

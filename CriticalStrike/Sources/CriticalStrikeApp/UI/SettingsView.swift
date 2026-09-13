@@ -290,13 +290,31 @@ struct HUDLayoutEditorView: View {
     @EnvironmentObject private var app: AppState
     @State private var selected: String?
 
-    private let editableElements = [
-        ("movementStick", "Movement"), ("fireButton", "Fire"), ("adsButton", "Aim"),
-        ("jumpButton", "Jump"), ("crouchButton", "Crouch"), ("reloadButton", "Reload"),
-        ("lethalButton", "Lethal"), ("tacticalButton", "Tactical"), ("meleeButton", "Melee"),
-        ("weaponSwap", "Swap"), ("useButton", "Interact"), ("pingButton", "Ping"),
-        ("minimap", "Minimap"), ("healthBar", "Health"), ("ammoCounter", "Ammo"),
-        ("killFeed", "Kill Feed"), ("scoreHeader", "Score")
+    /// A named struct rather than a tuple: SwiftUI's ForEach needs a key path to an id,
+    /// and Swift has no key paths into tuple elements.
+    private struct EditableElement: Identifiable {
+        let id: String
+        let label: String
+    }
+
+    private let editableElements: [EditableElement] = [
+        EditableElement(id: "movementStick", label: "Movement"),
+        EditableElement(id: "fireButton", label: "Fire"),
+        EditableElement(id: "adsButton", label: "Aim"),
+        EditableElement(id: "jumpButton", label: "Jump"),
+        EditableElement(id: "crouchButton", label: "Crouch"),
+        EditableElement(id: "reloadButton", label: "Reload"),
+        EditableElement(id: "lethalButton", label: "Lethal"),
+        EditableElement(id: "tacticalButton", label: "Tactical"),
+        EditableElement(id: "meleeButton", label: "Melee"),
+        EditableElement(id: "weaponSwap", label: "Swap"),
+        EditableElement(id: "useButton", label: "Interact"),
+        EditableElement(id: "pingButton", label: "Ping"),
+        EditableElement(id: "minimap", label: "Minimap"),
+        EditableElement(id: "healthBar", label: "Health"),
+        EditableElement(id: "ammoCounter", label: "Ammo"),
+        EditableElement(id: "killFeed", label: "Kill Feed"),
+        EditableElement(id: "scoreHeader", label: "Score")
     ]
 
     var body: some View {
@@ -304,17 +322,19 @@ struct HUDLayoutEditorView: View {
             ZStack {
                 Color.black.opacity(0.9).ignoresSafeArea()
 
-                ForEach(editableElements, id: \.0) { id, label in
-                    let layout = app.profile.settings.layout(for: id)
-                    Text(label)
+                ForEach(editableElements) { element in
+                    let layout = app.profile.settings.layout(for: element.id)
+                    Text(element.label)
                         .font(Theme.caption(10))
-                        .foregroundStyle(selected == id ? Theme.accent : Theme.textPrimary)
+                        .foregroundStyle(selected == element.id ? Theme.accent : Theme.textPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .background(RoundedRectangle(cornerRadius: 8)
-                            .fill(selected == id ? Theme.accent.opacity(0.25) : Theme.surfaceElevated))
+                            .fill(selected == element.id
+                                  ? Theme.accent.opacity(0.25) : Theme.surfaceElevated))
                         .overlay(RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(selected == id ? Theme.accent : Theme.stroke, lineWidth: 1))
+                            .strokeBorder(selected == element.id ? Theme.accent : Theme.stroke,
+                                          lineWidth: 1))
                         .scaleEffect(CGFloat(layout.scale))
                         .opacity(layout.hidden ? 0.35 : Double(layout.opacity))
                         .position(x: geometry.size.width * CGFloat(layout.x),
@@ -329,7 +349,7 @@ struct HUDLayoutEditorView: View {
                                     app.updateSettings { $0.updateLayout(updated) }
                                 }
                         )
-                        .onTapGesture { selected = id }
+                        .onTapGesture { selected = element.id }
                 }
 
                 VStack {

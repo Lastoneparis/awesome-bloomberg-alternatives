@@ -50,13 +50,14 @@ final class LootCrateTests: XCTestCase {
                 counts[reward.rarity, default: 0] += 1
             }
         }
-        for (rarity, published) in crate.publishedOdds() {
-            let observed = Double(counts[rarity] ?? 0) / Double(sampleCount) * 100
+        for entry in crate.publishedOdds() {
+            let observed = Double(counts[entry.rarity] ?? 0) / Double(sampleCount) * 100
             // The pity timer legitimately pushes epic+ above the base rate, so only the
             // common tiers are checked tightly.
-            if rarity < .epic {
-                XCTAssertEqual(observed, published, accuracy: max(1.5, published * 0.12),
-                               "\(rarity.displayName): published \(published)%, observed \(observed)%")
+            if entry.rarity < .epic {
+                XCTAssertEqual(observed, entry.percent, accuracy: max(1.5, entry.percent * 0.12),
+                               "\(entry.rarity.displayName): published \(entry.percent)%, "
+                               + "observed \(observed)%")
             }
         }
     }
