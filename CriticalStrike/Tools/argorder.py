@@ -13,7 +13,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCES = os.path.join(ROOT, "Sources")
+# Tests construct the same content types, so they can transpose arguments too.
+SOURCES = [os.path.join(ROOT, "Sources"), os.path.join(ROOT, "Tests")]
 
 TYPES = ["WeaponData", "AttachmentData", "PerkData", "GrenadeData", "CharacterData",
          "CosmeticData", "MapData", "GameModeData", "MapBrush", "MapLight", "MapProp",
@@ -31,9 +32,11 @@ TYPES = ["WeaponData", "AttachmentData", "PerkData", "GrenadeData", "CharacterDa
 
 def read_all():
     files = {}
-    for dirpath, _, names in os.walk(SOURCES):
-        for name in sorted(names):
-            if name.endswith(".swift"):
+    for base in SOURCES:
+        for dirpath, _, names in os.walk(base):
+            for name in sorted(names):
+                if not name.endswith(".swift"):
+                    continue
                 path = os.path.join(dirpath, name)
                 files[os.path.relpath(path, ROOT)] = open(path, encoding="utf-8").read()
     return files

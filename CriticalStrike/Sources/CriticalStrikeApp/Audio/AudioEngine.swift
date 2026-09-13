@@ -13,6 +13,10 @@ final class AudioEngine {
     private let uiMixer = AVAudioMixerNode()
 
     private var buffers: [String: AVAudioPCMBuffer] = [:]
+    /// Synthesised audio, used for any name the bundle does not supply. The game ships no
+    /// sound files, so in practice this is every sound — but a bundled file still wins, so
+    /// real recordings can be dropped in later without touching a line of this.
+    private var procedural: ProceduralSoundLibrary?
     private var spatialPool: [AVAudioPlayerNode] = []
     private var uiPool: [AVAudioPlayerNode] = []
     private var nextSpatial = 0
@@ -66,6 +70,10 @@ final class AudioEngine {
         do {
             try engine.start()
             isRunning = true
+            // The device decides the rate; the synthesiser has to match it or the player
+            // nodes will refuse the buffers.
+            procedural = ProceduralSoundLibrary(
+                sampleRate: engine.outputNode.outputFormat(forBus: 0).sampleRate)
         } catch {
             Log.error("Audio engine failed to start: \(error)", category: "audio")
         }
@@ -177,17 +185,18 @@ final class AudioEngine {
 
     private func buffer(named name: String) -> AVAudioPCMBuffer? {
         if let cached = buffers[name] { return cached }
-        guard let url = Bundle.main.url(forResource: name, withExtension: "wav")
+        if let url = Bundle.main.url(forResource: name, withExtension: "wav")
             ?? Bundle.main.url(forResource: name, withExtension: "m4a")
-            ?? Bundle.main.url(forResource: name, withExtension: "caf") else {
-            return nil
+            ?? Bundle.main.url(forResource: name, withExtension: "caf"),
+           let file = try? AVAudioFile(forReading: url),
+           let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                         frameCapacity: AVAudioFrameCount(file.length)) {
+            try? file.read(into: buffer)
+            buffers[name] = buffer
+            return buffer
         }
-        guard let file = try? AVAudioFile(forReading: url),
-              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-                                            frameCapacity: AVAudioFrameCount(file.length)) else {
-            return nil
-        }
-        try? file.read(into: buffer)
+        // Nothing in the bundle: synthesise it.
+        guard let buffer = procedural?.buffer(named: name) else { return nil }
         buffers[name] = buffer
         return buffer
     }
@@ -198,22 +207,40 @@ final class AudioEngine {
                       channels: 1)
     }
 
-    /// Preloads the sounds a match will need so the first gunshot never stutters.
-    func preload(for map: MapData, loadout: Loadout) {
-        var names: Set<String> = [
-            "sfx_hitmarker", "sfx_headshot", "sfx_kill", "sfx_death",
-            "sfx_reload_empty", "sfx_dryfire", "sfx_grenade_bounce", "sfx_explosion",
-            "sfx_flash", "sfx_smoke", "sfx_fire_loop", "sfx_pickup", "sfx_jump", "sfx_land",
-            map.environment.ambienceLoop, map.environment.musicTrack
-        ]
+    /// The menu set. Kept separate from the match set because it is needed at launch,
+    /// before there is a loading screen to hide synthesis behind.
+    func warmUpMenu() async {
+        let names = ["mus_menu", "ui_equip", "ui_attach", "ui_purchase", "ui_crate_open",
+                     "sfx_ui_click", "sfx_ui_back", "sfx_error", "sfx_purchase"]
+        await procedural?.warmUp(names: names)
+        for name in names { _ = buffer(named: name) }
+    }
+
+    /// Every sound a match can ask for. Synthesis is not free — a music bed is tens of
+    /// milliseconds — so this runs during the loading screen and nothing is generated on
+    /// the audio thread mid-match.
+    func soundNames(for map: MapData, loadout: Loadout) -> [String] {
+        var names = Set(SoundBank.fixedNames)
+        names.insert(map.environment.ambienceLoop)
+        names.insert(map.environment.musicTrack)
         for surface in SurfaceKind.allCases {
             names.insert(surface.footstepSound)
+            names.insert(surface.impactSound)
         }
         for build in [loadout.primary, loadout.secondary, loadout.melee] {
             let weapon = build.resolved()
             names.insert(weapon.fireSound)
             names.insert(weapon.reloadSound)
         }
+        return Array(names)
+    }
+
+    /// Preloads the sounds a match will need so the first gunshot never stutters.
+    func preload(for map: MapData, loadout: Loadout) async {
+        let names = soundNames(for: map, loadout: loadout)
+        // Synthesis happens in parallel off the main actor; the resulting buffers are then
+        // handed over one at a time, because the bundle cache is not itself thread safe.
+        await procedural?.warmUp(names: names)
         for name in names { _ = buffer(named: name) }
     }
 }

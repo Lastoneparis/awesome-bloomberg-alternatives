@@ -92,6 +92,13 @@ code actually rolls; a daily shop; and rewarded ads that are always optional.
 **Progression** — 55 levels with prestige, competitive ranks with Elo-style rating,
 per-weapon attachment unlocks, lifetime stats, and daily/weekly/career missions.
 
+**Audio** — A full procedural synthesis pipeline: oscillators, noise, envelopes, a
+state-variable filter, saturation and a comb-filter room, composed into every gunshot,
+footstep, impact, announcement, ambience bed and music track in the game. Weapon reports
+are derived from the same `WeaponData` the damage model reads, so a heavier round really
+does sound heavier and rebalancing a weapon rebalances how it sounds. Spatialised through
+`AVAudioEnvironmentNode` with pooled voices. See [AUDIO.md](Docs/AUDIO.md).
+
 **Presentation** — A full procedural PBR pipeline: tileable noise → height field → albedo,
 normal, roughness, occlusion and metalness, generated in parallel during loading and cached
 to disk. Generated skyboxes that also drive image-based lighting, world-space UVs so texel
@@ -113,6 +120,7 @@ curves per aim state.
 | [NETCODE.md](Docs/NETCODE.md) | Prediction, reconciliation, interpolation, lag compensation |
 | [MONETIZATION.md](Docs/MONETIZATION.md) | Every product, published crate odds, App Store compliance |
 | [TEXTURES.md](Docs/TEXTURES.md) | The procedural art pipeline, with preview sheets |
+| [AUDIO.md](Docs/AUDIO.md) | The procedural audio pipeline, with waveform sheets |
 | [BUILD_PLAN.md](Docs/BUILD_PLAN.md) | The checklist this project was built against |
 
 ## Assets
@@ -127,5 +135,7 @@ The only committed images are the App Store icon and the menu wordmark, which ha
 before the app launches; both are produced by `Tools/generate_assets.py`, which includes its
 own PNG encoder so there is nothing to install.
 
-Sound effects are looked up by name and simply do not play if a file is absent, so dropping
-real audio into the bundle is the only thing needed to complete the presentation.
+Sound is generated the same way. `AudioEngine` looks sounds up by name, as it always did,
+and a bundled file of that name still wins — so real recordings can be dropped in later
+without touching a line of the synthesis. Until then every sound in the game is built from
+noise, sines and filters at load time.

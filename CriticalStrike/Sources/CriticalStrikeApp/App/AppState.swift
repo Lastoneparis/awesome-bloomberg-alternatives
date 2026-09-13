@@ -80,7 +80,13 @@ final class AppState: ObservableObject {
         Task { await gameCenter.authenticate() }
 
         audio.start()
-        audio.playMusic("mus_menu")
+        // Every sound is synthesised, so the menu bed has to be built before it can play.
+        // Off the main thread: a music bed is tens of milliseconds and this is the first
+        // frame the app ever draws.
+        Task { @MainActor in
+            await audio.warmUpMenu()
+            audio.playMusic("mus_menu")
+        }
         startAutosave()
 
         Task { @MainActor in
@@ -614,7 +620,7 @@ final class AppState: ObservableObject {
         self.session?.end()
         self.session = nil
         go(to: .results)
-        audio.playMusic(won ? "mus_victory" : "mus_defeat")
+        audio.playMusic(won ? "mus_victory" : "mus_defeat", loop: false)
     }
 
     // MARK: - Matchmaking

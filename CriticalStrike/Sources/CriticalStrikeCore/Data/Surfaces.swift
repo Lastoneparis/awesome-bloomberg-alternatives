@@ -50,6 +50,7 @@ public enum SurfaceKind: UInt8, Codable, CaseIterable, Sendable {
     }
 
     public var impactEffect: String { "fx_impact_\(String(describing: self))" }
+    public var impactSound: String { "sfx_impact_\(String(describing: self))" }
     public var footstepSound: String { "sfx_step_\(String(describing: self))" }
     public var decalName: String { self == .glass ? "decal_glass" : "decal_bullet_\(String(describing: self))" }
 }

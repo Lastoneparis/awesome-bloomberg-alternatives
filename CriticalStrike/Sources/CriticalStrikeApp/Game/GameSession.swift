@@ -119,7 +119,7 @@ final class GameSession: NSObject, ObservableObject {
             report?(0.1 + value * 0.7)
         }
 
-        audio.preload(for: map, loadout: loadout)
+        await audio.preload(for: map, loadout: loadout)
         onProgress?(0.85)
 
         // Build the level and sky now that the textures exist.
@@ -376,7 +376,7 @@ final class GameSession: NSObject, ObservableObject {
         case let .bulletImpact(position, normal, surface, penetrated):
             gameRenderer.effects.bulletImpact(position: position, normal: normal,
                                           surface: surface, penetrated: penetrated)
-            audio.playSpatial(surface.impactEffect, at: position, volume: 0.55)
+            audio.playSpatial(surface.impactSound, at: position, volume: 0.55)
 
         case let .playerDamaged(victim, attacker, amount, hitbox, position):
             if victim == localPlayerID {
