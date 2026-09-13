@@ -23,7 +23,25 @@ final class MaterialLibrary {
     // MARK: - World surfaces
 
     func material(for surface: SurfaceKind, tintOverride: UIColor? = nil) -> SCNMaterial {
+        makeSurfaceMaterial(surface: surface, tint: tintOverride, macroVariation: true)
+    }
+
+    /// A material for something that is *not* level geometry — a weapon part, a shell
+    /// casing, anything small that moves.
+    ///
+    /// Identical to the world material except that it skips the macro variation, which is
+    /// sampled in world space: on a view model welded to the camera, the gun would drift
+    /// through the variation map as the player walked and its plastic would visibly
+    /// shimmer. World space is the right frame for a wall and the wrong one for a prop in
+    /// your hands.
+    func partMaterial(for surface: SurfaceKind, tint: UIColor? = nil) -> SCNMaterial {
+        makeSurfaceMaterial(surface: surface, tint: tint, macroVariation: false)
+    }
+
+    private func makeSurfaceMaterial(surface: SurfaceKind, tint tintOverride: UIColor?,
+                                     macroVariation: Bool) -> SCNMaterial {
         let key = "surface_\(surface.rawValue)_\(tintOverride?.description ?? "-")"
+            + (macroVariation ? "" : "_part")
         if let cached = cache[key] { return cached }
 
         let set = textures.surfaceTextures(surface)
@@ -39,7 +57,7 @@ final class MaterialLibrary {
         apply(set: set, to: material, defaultRoughness: defaultRoughness(for: surface),
               defaultMetalness: defaultMetalness(for: surface))
         configureSampling(material)
-        applyMacroVariation(to: material, surface: surface)
+        if macroVariation { applyMacroVariation(to: material, surface: surface) }
 
         switch surface {
         case .glass:

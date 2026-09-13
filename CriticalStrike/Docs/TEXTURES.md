@@ -94,6 +94,12 @@ walls meeting at a corner agree. Roughness is nudged the same way, which is what
 light travel across a wall instead of sitting flat on it. The whole thing costs one extra
 texture fetch, and one image shared by every material in the level.
 
+One place it must *not* apply is anything held or thrown. World space is the right frame
+for a wall and the wrong one for a prop in your hands: a view model welded to the camera
+would drift through the variation map as the player walked, and the gun's plastic would
+visibly shimmer. `partMaterial` is the same material without the modifier, and weapons,
+attachments and grenades use it.
+
 The map itself is three scales, and it needs all three. Broad fBm on its own reads as fog
 drifting across the wall rather than as anything that happened to the wall; the mid band
 supplies streaks and stains, and cellular patches supply the flat-toned regions that make

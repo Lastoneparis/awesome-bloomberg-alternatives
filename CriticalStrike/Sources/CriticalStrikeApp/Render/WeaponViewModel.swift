@@ -34,6 +34,12 @@ final class WeaponViewModel {
     private var isReloading = false
     private var jumpOffset: Float = 0
 
+    // Hands. The support hand leaves the handguard during a reload, which is most of what
+    // sells a reload without a rigged animation.
+    private var supportHand: SCNNode?
+    private var supportRestPosition = SCNVector3Zero
+    private var supportMagazinePosition = SCNVector3Zero
+
     // Anchors
     private static let hipPosition = Vec3(0.19, -0.175, -0.34)
     private static let hipRotation = Vec3(0, -0.06, 0)
@@ -49,8 +55,6 @@ final class WeaponViewModel {
         rigNode.addChildNode(modelNode)
         modelNode.addChildNode(muzzlePoint)
         modelNode.addChildNode(ejectPoint)
-        // The viewmodel renders in its own pass so a long barrel never clips into a wall.
-        root.renderingOrder = 50
     }
 
     var muzzleWorldPosition: SCNVector3 { muzzlePoint.presentation.worldPosition }
@@ -71,6 +75,13 @@ final class WeaponViewModel {
             model.addChildNode(attachment)
         }
         modelNode.addChildNode(model)
+        attachHands(for: weapon)
+        // renderingOrder is per node and is not inherited, so it has to be stamped on
+        // every piece of geometry. It orders the view model after the world, which is what
+        // keeps it in front of glass and smoke; it does not exempt it from the depth
+        // buffer, so a long barrel still clips when you stand flat against a wall. Fixing
+        // that properly needs a second render pass with its own depth range.
+        WeaponViewModel.setRenderingOrder(50, on: root)
         muzzlePoint.position = SCNVector3(0, 0.012, -Float(WeaponViewModel.barrelLength(for: weapon)))
         ejectPoint.position = SCNVector3(0.045, 0.02, -0.05)
 
@@ -93,7 +104,7 @@ final class WeaponViewModel {
         let node = SCNNode()
         node.name = weapon.id.value
         let body = materials.weaponMaterial(skin: skin)
-        let dark = materials.material(for: .plastic, tintOverride: UIColor(white: 0.12, alpha: 1))
+        let dark = materials.partMaterial(for: .plastic, tint: UIColor(white: 0.12, alpha: 1))
 
         func box(_ w: CGFloat, _ h: CGFloat, _ l: CGFloat, _ position: SCNVector3,
                  material: SCNMaterial, chamfer: CGFloat = 0.004) -> SCNNode {
@@ -172,12 +183,125 @@ final class WeaponViewModel {
         return node
     }
 
+    private static func setRenderingOrder(_ order: Int, on node: SCNNode) {
+        node.renderingOrder = order
+        for child in node.childNodes { setRenderingOrder(order, on: child) }
+    }
+
+    // MARK: - Hands
+
+    /// Where each weapon class is held. Without hands the gun floats in front of the
+    /// camera, which is the single most obvious tell of an unfinished first-person view —
+    /// and it is cheap to fix, because the forearms leave the frame before they would
+    /// need an elbow. That is why no mobile shooter models one.
+    private struct HandAnchors {
+        var trigger: SCNVector3
+        var support: SCNVector3?
+        /// Where the support hand goes to fetch a magazine.
+        var magazine: SCNVector3
+    }
+
+    private static func handAnchors(for weapon: WeaponData) -> HandAnchors {
+        switch weapon.weaponClass {
+        case .assaultRifle, .lightMachineGun, .marksman:
+            return HandAnchors(trigger: SCNVector3(0, -0.088, 0.02),
+                               support: SCNVector3(0, -0.046, -0.16),
+                               magazine: SCNVector3(-0.02, -0.17, -0.04))
+        case .submachineGun:
+            return HandAnchors(trigger: SCNVector3(0, -0.072, 0.01),
+                               support: SCNVector3(0, -0.046, -0.12),
+                               magazine: SCNVector3(-0.02, -0.19, -0.05))
+        case .sniperRifle:
+            return HandAnchors(trigger: SCNVector3(0, -0.082, 0.06),
+                               support: SCNVector3(0, -0.05, -0.10),
+                               magazine: SCNVector3(-0.02, -0.18, 0.0))
+        case .shotgun:
+            // On the pump, which is also where it travels when the action is worked.
+            return HandAnchors(trigger: SCNVector3(0, -0.082, 0.05),
+                               support: SCNVector3(0, -0.048, -0.14),
+                               magazine: SCNVector3(0, -0.048, -0.04))
+        case .pistol:
+            // Both hands on the grip: a one-handed pistol reads as a placeholder.
+            return HandAnchors(trigger: SCNVector3(0, -0.078, 0.03),
+                               support: SCNVector3(-0.034, -0.072, 0.045),
+                               magazine: SCNVector3(-0.03, -0.19, 0.03))
+        case .melee:
+            return HandAnchors(trigger: SCNVector3(0, -0.012, 0.035), support: nil,
+                               magazine: SCNVector3(0, -0.012, 0.035))
+        case .grenade, .special:
+            return HandAnchors(trigger: SCNVector3(0, -0.03, 0.03), support: nil,
+                               magazine: SCNVector3(0, -0.03, 0.03))
+        }
+    }
+
+    private func attachHands(for weapon: WeaponData) {
+        let anchors = WeaponViewModel.handAnchors(for: weapon)
+        // Gloves and fatigues rather than skin: the fabric generator already produces a
+        // weave, and bare hands would need a skin tone that no two players agree on.
+        let glove = materials.partMaterial(for: .fabric, tint: UIColor(white: 0.22, alpha: 1))
+        let sleeve = materials.partMaterial(for: .fabric, tint: UIColor(hex: 0x555B47))
+
+        let right = WeaponViewModel.handNode(isRight: true, glove: glove, sleeve: sleeve)
+        right.position = anchors.trigger
+        modelNode.addChildNode(right)
+
+        if let supportPosition = anchors.support {
+            let left = WeaponViewModel.handNode(isRight: false, glove: glove, sleeve: sleeve)
+            left.position = supportPosition
+            modelNode.addChildNode(left)
+            supportHand = left
+            supportRestPosition = supportPosition
+            supportMagazinePosition = anchors.magazine
+        } else {
+            supportHand = nil
+        }
+    }
+
+    private static func handNode(isRight: Bool, glove: SCNMaterial, sleeve: SCNMaterial) -> SCNNode {
+        let node = SCNNode()
+        node.name = isRight ? "hand_right" : "hand_left"
+        let side: Float = isRight ? 1 : -1
+
+        let fist = SCNBox(width: 0.05, height: 0.06, length: 0.07, chamferRadius: 0.021)
+        fist.firstMaterial = glove
+        node.addChildNode(SCNNode(geometry: fist))
+
+        // The thumb is four millimetres of geometry and it is what stops the fist reading
+        // as a block glued to the grip.
+        let thumb = SCNBox(width: 0.017, height: 0.017, length: 0.046, chamferRadius: 0.008)
+        thumb.firstMaterial = glove
+        let thumbNode = SCNNode(geometry: thumb)
+        thumbNode.position = SCNVector3(-0.025 * side, 0.023, 0.004)
+        thumbNode.eulerAngles = SCNVector3(0.32, 0, 0)
+        node.addChildNode(thumbNode)
+
+        // Forearm, hinged at the wrist. The pivot puts the hinge at the wrist end so the
+        // box runs backward from there; pitch drops the elbow end below the wrist and yaw
+        // carries it out to that shoulder, which is what takes it off screen.
+        let forearm = SCNBox(width: 0.062, height: 0.068, length: 0.30, chamferRadius: 0.026)
+        forearm.firstMaterial = sleeve
+        let forearmNode = SCNNode(geometry: forearm)
+        forearmNode.pivot = SCNMatrix4MakeTranslation(0, 0, -0.15)
+        forearmNode.position = SCNVector3(0, -0.004, 0.018)
+        forearmNode.eulerAngles = SCNVector3(0.2, 0.36 * side, 0)
+        node.addChildNode(forearmNode)
+
+        // Cuff, where the glove meets the sleeve.
+        let cuff = SCNBox(width: 0.058, height: 0.064, length: 0.026, chamferRadius: 0.02)
+        cuff.firstMaterial = glove
+        let cuffNode = SCNNode(geometry: cuff)
+        cuffNode.position = SCNVector3(0, -0.002, 0.042)
+        node.addChildNode(cuffNode)
+
+        return node
+    }
+
     static func attachmentNodes(for build: WeaponBuild, materials: MaterialLibrary) -> [SCNNode] {
         var nodes: [SCNNode] = []
         for id in build.normalizedAttachments {
             guard let attachment = AttachmentDatabase.attachment(id) else { continue }
-            let material = materials.material(for: .plastic,
-                                              tintOverride: UIColor(white: 0.1, alpha: 1))
+            let material = materials.partMaterial(for: .plastic,
+                                                 tint: UIColor(white: 0.1, alpha: 1))
             switch attachment.slot {
             case .optic:
                 let geometry = SCNBox(width: 0.03, height: 0.035, length: 0.07, chamferRadius: 0.005)
@@ -311,6 +435,17 @@ final class WeaponViewModel {
             position.z += 0.03 * curve
             rotation.x += 0.5 * curve
             rotation.z += 0.25 * curve
+        }
+
+        // The support hand drops off the handguard to fetch a magazine and comes back.
+        // It is two lerps, and it does more for how a reload reads than the weapon tilt.
+        if let supportHand {
+            let reach = isReloading ? sin(reloadProgress * .pi) : 0
+            supportHand.position = SCNVector3(
+                MathUtil.lerp(supportRestPosition.x, supportMagazinePosition.x, reach),
+                MathUtil.lerp(supportRestPosition.y, supportMagazinePosition.y, reach),
+                MathUtil.lerp(supportRestPosition.z, supportMagazinePosition.z, reach))
+            supportHand.eulerAngles = SCNVector3(reach * 0.55, 0, reach * -0.3)
         }
 
         rigNode.position = SCNVector3(position.x, position.y, position.z)

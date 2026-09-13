@@ -304,8 +304,10 @@ final class EffectsSystem {
         case .molotov: color = 0xB05A22
         case .decoy: color = 0x7A6A9A
         }
-        node.geometry?.firstMaterial = materials.material(for: .metal,
-                                                          tintOverride: UIColor(hex: color))
+        // A thrown grenade travels, so it takes the part material: world-space variation
+        // on a moving object shifts its tone as it flies.
+        node.geometry?.firstMaterial = materials.partMaterial(for: .metal,
+                                                              tint: UIColor(hex: color))
         node.position = SCNVector3(position.x, position.y, position.z)
 
         // Blinking fuse light so a live grenade at your feet is unmissable.
