@@ -41,6 +41,8 @@ For building your own tools.
 - **[Yahoo Finance API](https://github.com/ranaroussi/yfinance)** (unofficial) — Python library, widely used.
 - **[IEX Cloud](https://iexcloud.io)** — US equity data, cost-effective.
 - **[Tiingo](https://api.tiingo.com)** — EOD + intraday stock data, crypto, news.
+- [HostDeFi](https://hostdefi.com) - Free token-safety scanner for Solana and EVM tokens: A+–F grades from on-chain checks, keyless REST API, hosted MCP server.
+
 
 ## Screeners & Scanners
 
