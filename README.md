@@ -29,6 +29,7 @@ All-in-one alternatives that try to replicate the Bloomberg Terminal experience.
 - **[TIKR](https://www.tikr.com)** — Equity research platform with 10y+ financial data for 50k+ stocks globally. *Freemium*.
 - **[Finviz](https://finviz.com)** — US equities screener and heatmaps. Basic but fast. *Freemium*.
 - **[Stock Analysis](https://stockanalysis.com)** — Clean stock data, fundamentals, SEC filings. *Free*.
+- **[Gloomberb](https://github.com/gloom-sh/gloomberb)** — Open-source finance terminal for the terminal, desktop and browser: quotes, charts, news, filings, portfolios and an AI research assistant. Real-time data with the paid Cloud Pro plan. *Freemium*.
 
 ## Market Data APIs
 
