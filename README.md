@@ -59,6 +59,7 @@ For building your own tools.
 
 ## SEC Filings & Insider Tracking
 
+- **[InsiderTrace](https://insidertrace.com)** — Free SEC Form 4 insider-trading tracker: screen recent filings, cluster buys, and insider leaderboards by company. *Free*
 - **[SEC EDGAR](https://www.sec.gov/edgar)** — Official source. Free API.
 - **[OpenInsider](http://openinsider.com)** — Form 4 filings, free.
 - **[Swiss-Quant SEC Tracker](https://swiss-quant.ch)** — Insider trading + institutional holdings.
