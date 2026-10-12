@@ -52,10 +52,11 @@ For building your own tools.
 ## Economic Data
 
 - **[FRED](https://fred.stlouisfed.org)** — Federal Reserve Economic Data. 800k+ series, free API.
-- **[World Bank Open Data](https://data.worldbank.org)** — Country-level macro indicators.
+- **[Investing.com Economic Calendar](https://www.investing.com/economic-calendar/)** — Free, granular.
+- **[Invokely](https://invokely.ai/docs)** - Source-cited official statistics for countries and regions via MCP; Free includes 500 MCP calls/month. REST data queries require Builder, Pro or prepaid credits. *Freemium*.
 - **[OECD Data](https://data.oecd.org)** — Economic statistics for OECD members.
 - **[Trading Economics](https://tradingeconomics.com)** — Economic calendar + indicators.
-- **[Investing.com Economic Calendar](https://www.investing.com/economic-calendar/)** — Free, granular.
+- **[World Bank Open Data](https://data.worldbank.org)** — Country-level macro indicators.
 
 ## SEC Filings & Insider Tracking
 
