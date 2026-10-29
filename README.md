@@ -37,6 +37,7 @@ For building your own tools.
 - **[Alpha Vantage](https://www.alphavantage.co)** — Stocks, forex, crypto, indicators. 25 requests/day free.
 - **[Polygon.io](https://polygon.io)** — Institutional-grade equity data. Free tier limited.
 - **[Finnhub](https://finnhub.io)** — Real-time stock quotes, news, fundamentals. 60 calls/min free.
+- **[SiftingIO](https://sifting.io/)** - Real-time and historical US stock, forex, commodity and crypto data through REST and WebSocket, with Python and Go SDKs, plus a JavaScript SDK with TypeScript types. *Freemium*.
 - **[Twelve Data](https://twelvedata.com)** — Global market data across asset classes.
 - **[Yahoo Finance API](https://github.com/ranaroussi/yfinance)** (unofficial) — Python library, widely used.
 - **[IEX Cloud](https://iexcloud.io)** — US equity data, cost-effective.
