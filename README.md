@@ -51,8 +51,8 @@ For building your own tools.
 
 ## Economic Data
 
-- **[MacroDial](https://macrodial.org/)** — Free dashboard for U.S. macroeconomic conditions, organizing traceable public indicators for research. Submitted by MacroDial Team; we are affiliated with the project.
 - **[FRED](https://fred.stlouisfed.org)** — Federal Reserve Economic Data. 800k+ series, free API.
+- **[MacroDial](https://macrodial.org/)** — Dashboard for U.S. macroeconomic conditions, with traceable public indicators for research. *Free.*
 - **[World Bank Open Data](https://data.worldbank.org)** — Country-level macro indicators.
 - **[OECD Data](https://data.oecd.org)** — Economic statistics for OECD members.
 - **[Trading Economics](https://tradingeconomics.com)** — Economic calendar + indicators.
